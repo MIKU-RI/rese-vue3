@@ -41,9 +41,14 @@
       <el-table-column label="总金额" align="center" prop="totalAmount" width="120">
         <template #default="scope">¥ {{ formatMoney(scope.row.totalAmount) }}</template>
       </el-table-column>
-      <el-table-column label="状态" align="center" prop="status" width="90">
+      <el-table-column label="状态" align="center" prop="status" width="120">
         <template #default="scope">
-          <el-tag :type="scope.row.status === '0' ? 'warning' : 'success'">{{ scope.row.status === '0' ? '待出库' : '已出库' }}</el-tag>
+          <el-tag v-if="scope.row.returnStatus === '3'" type="info">已退货</el-tag>
+          <el-tag v-else-if="scope.row.returnStatus === '2'" type="warning">
+            部分退货 {{ scope.row.returnQty }}/{{ scope.row.totalQty }}
+          </el-tag>
+          <el-tag v-else-if="scope.row.returnStatus === '1'" type="warning">退货中</el-tag>
+          <el-tag v-else :type="scope.row.status === '0' ? 'warning' : 'success'">{{ scope.row.status === '0' ? '待出库' : '已出库' }}</el-tag>
         </template>
       </el-table-column>
       <el-table-column label="创建时间" align="center" prop="createTime" width="160">
@@ -53,10 +58,10 @@
         <template #default="scope">
           <el-button link type="primary" icon="View" @click="handleDetail(scope.row)">明细</el-button>
           <el-button v-if="scope.row.status === '0'" link type="success" icon="Bottom" @click="handleOutbound(scope.row)" v-hasPermi="['beverage:sale:edit']">出库</el-button>
-          <el-button v-if="scope.row.status === '1'" link type="danger" icon="RefreshLeft" @click="goReturn(scope.row)" :disabled="returning" v-hasPermi="['beverage:return:add']">退货</el-button>
-          <el-button v-if="scope.row.status === '1' && isAdmin" link type="warning" icon="Top" @click="handleReverseOutbound(scope.row)" v-hasPermi="['beverage:sale:edit']">撤销出库</el-button>
-          <el-button v-if="scope.row.status === '0' || isAdmin" link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['beverage:sale:edit']">修改</el-button>
-          <el-button v-if="scope.row.status === '0' || isAdmin" link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['beverage:sale:remove']">删除</el-button>
+          <el-button v-if="scope.row.status === '1'" link type="danger" icon="RefreshLeft" @click="goReturn(scope.row)" :disabled="returning || allReturned(scope.row)" :title="allReturned(scope.row) ? '该单已全部退货，无剩余可退数量' : ''" v-hasPermi="['beverage:return:add']">退货</el-button>
+          <el-button v-if="scope.row.status === '1' && isAdmin" link type="warning" icon="Top" @click="handleReverseOutbound(scope.row)" :disabled="hasReturn(scope.row)" :title="hasReturn(scope.row) ? '该单已产生退货记录，不可撤销出库；如需调整请通过「销售退货单」处理' : ''" v-hasPermi="['beverage:sale:edit']">撤销出库</el-button>
+          <el-button v-if="(scope.row.status === '0' || isAdmin) && !hasReturn(scope.row)" link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['beverage:sale:edit']">修改</el-button>
+          <el-button v-if="(scope.row.status === '0' || isAdmin) && !hasReturn(scope.row)" link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['beverage:sale:remove']">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -179,6 +184,11 @@ const isAdmin = computed(() => {
   const roles = useUserStore().roles || []
   return roles.includes('admin')
 })
+
+// 退货状态：已产生退货记录的单据不可再撤销出库/修改/删除（后端亦硬拦截）
+// returnStatus: 0未退货 1退货中 2部分退货 3已退货(全部退完)
+const hasReturn = (row) => !!row.returnStatus && row.returnStatus !== '0'
+const allReturned = (row) => row.returnStatus === '3'
 
 // 关联下拉数据
 const customerOptions = ref([])
