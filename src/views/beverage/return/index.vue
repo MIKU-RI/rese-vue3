@@ -155,7 +155,8 @@
         <el-table :data="form.items" border>
           <el-table-column label="商品" min-width="180">
             <template #default="scope">
-              <el-select v-model="scope.row.productId" placeholder="选择商品" filterable style="width:100%" @change="(val) => onProductChange(scope.row, val)" :disabled="sourceLocked">
+              <span v-if="sourceLocked" style="line-height:32px;">{{ scope.row.productName || '-' }}</span>
+              <el-select v-else v-model="scope.row.productId" placeholder="选择商品" filterable style="width:100%" @change="(val) => onProductChange(scope.row, val)">
                 <el-option v-for="p in productOptions" :key="p.productId" :label="p.productName" :value="p.productId" />
               </el-select>
             </template>
@@ -168,8 +169,8 @@
           </el-table-column>
           <el-table-column label="数量" width="115">
             <template #default="scope">
-              <el-input-number v-model="scope.row.qty" :min="1" :precision="0" :max="scope.row.origQty || undefined" :controls-position="'right'" style="width:100%" @change="recalc" />
-              <div v-if="scope.row.origQty" style="color:#909399;font-size:12px;line-height:1.3;">原单 {{ scope.row.origQty }}{{ scope.row.unit }}</div>
+              <el-input-number v-model="scope.row.qty" :min="1" :precision="0" :max="scope.row.remainingQty || scope.row.origQty || undefined" :controls-position="'right'" style="width:100%" @change="recalc" />
+              <div v-if="scope.row.origQty" style="color:#909399;font-size:12px;line-height:1.3;">原单 {{ scope.row.origQty }}{{ scope.row.unit }}，剩余可退 {{ scope.row.remainingQty != null ? scope.row.remainingQty : scope.row.origQty }}{{ scope.row.unit }}</div>
             </template>
           </el-table-column>
           <el-table-column :label="isPurchaseReturn ? '进货价' : '售价'" width="115">
@@ -223,7 +224,7 @@
 </template>
 
 <script setup name="BeverageReturn">
-import { listReturn, getReturn, delReturn, addReturn, updateReturn } from "@/api/beverage/return"
+import { listReturn, getReturn, delReturn, addReturn, updateReturn, getRemainingQty } from "@/api/beverage/return"
 import { listSupplier } from "@/api/beverage/supplier"
 import { listCustomer } from "@/api/beverage/customer"
 import { listProduct } from "@/api/beverage/product"
@@ -325,7 +326,7 @@ function reloadSourceOptions() {
   }
 }
 
-// 选择原单后自动带出该单往来单位与明细（数量可改，但不超过原单数量）
+// 选择原单后自动带出该单往来单位与明细（数量按剩余可退数量预填，不超过剩余数量）
 function onSourceChange(sourceId) {
   if (!sourceId) {
     form.value.sourceId = undefined
@@ -340,10 +341,11 @@ function onSourceChange(sourceId) {
     return
   }
   loadingSource.value = true
-  const done = () => { loadingSource.value = false }
-  if (isPurchaseReturn.value) {
-    getPurchase(sourceId).then(res => {
-      const d = res.data || {}
+  const sourceType = isPurchaseReturn.value ? '1' : '2'
+  const fetch = isPurchaseReturn.value ? getPurchase : getSale
+  fetch(sourceId).then(res => {
+    const d = res.data || {}
+    if (isPurchaseReturn.value) {
       form.value.sourceId = d.purchaseId
       form.value.sourceNo = d.purchaseNo
       form.value.supplierId = d.supplierId
@@ -351,15 +353,7 @@ function onSourceChange(sourceId) {
       form.value.partnerId = d.supplierId
       form.value.customerId = undefined
       form.value.customerName = undefined
-      form.value.items = (d.items || []).map(it => ({
-        productId: it.productId, productName: it.productName, spec: it.spec, unit: it.unit,
-        qty: it.qty, origQty: it.qty, price: it.price, discount: 100, sourceQty: it.qty
-      }))
-      done()
-    }).catch(done)
-  } else {
-    getSale(sourceId).then(res => {
-      const d = res.data || {}
+    } else {
       form.value.sourceId = d.saleId
       form.value.sourceNo = d.saleNo
       form.value.customerId = d.customerId
@@ -367,16 +361,39 @@ function onSourceChange(sourceId) {
       form.value.partnerId = d.customerId
       form.value.supplierId = undefined
       form.value.supplierName = undefined
-      form.value.items = (d.items || []).map(it => ({
-        productId: it.productId, productName: it.productName, spec: it.spec, unit: it.unit,
-        qty: it.qty, origQty: it.qty, price: it.price,
-        discount: (it.discount == null || Number(it.discount) === 0) ? 100 : Number(it.discount),
-        sourceQty: it.qty
-      }))
-      done()
-    }).catch(done)
-  }
-  proxy.$refs.returnRef && proxy.$refs.returnRef.clearValidate(['partnerId'])
+    }
+    return getRemainingQty(sourceType, sourceId)
+  }).then(res2 => {
+    const list = (res2.data || []).filter(r => r.remainingQty > 0)
+    if (list.length === 0) {
+      proxy.$modal.msgWarning('该来源单据商品已全部退完，无法继续退货')
+      clearSourceSelection()
+      loadingSource.value = false
+      return
+    }
+    form.value.items = list.map(r => ({
+      productId: r.productId, productName: r.productName, spec: r.spec, unit: r.unit,
+      qty: r.remainingQty, origQty: r.origQty, remainingQty: r.remainingQty,
+      price: r.price, discount: r.discount != null ? Number(r.discount) : 100, sourceQty: r.origQty
+    }))
+    proxy.$refs.returnRef && proxy.$refs.returnRef.clearValidate(['partnerId'])
+    loadingSource.value = false
+  }).catch(err => {
+    loadingSource.value = false
+    console.error(err)
+  })
+}
+
+// 仅清空来源单选择（保留类型/日期等其余字段）
+function clearSourceSelection() {
+  form.value.sourceId = undefined
+  form.value.sourceNo = undefined
+  form.value.supplierId = undefined
+  form.value.supplierName = undefined
+  form.value.customerId = undefined
+  form.value.customerName = undefined
+  form.value.partnerId = undefined
+  form.value.items = []
 }
 
 // 供其它页面跳转带参进入：sourceType=1采购退货/2销售退货 + sourceId/sourceNo

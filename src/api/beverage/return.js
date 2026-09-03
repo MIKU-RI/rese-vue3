@@ -52,3 +52,12 @@ export function autoCreateReturn(data) {
     data: data
   })
 }
+
+// 查询来源单据剩余可退数量（按商品汇总）
+export function getRemainingQty(sourceType, sourceId) {
+  return request({
+    url: '/beverage/return/remaining',
+    method: 'get',
+    params: { sourceType, sourceId }
+  })
+}
