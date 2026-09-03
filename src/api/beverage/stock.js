@@ -18,6 +18,15 @@ export function getStock(stockId) {
   })
 }
 
+// 按商品汇总当前库存（库存概览）
+export function getStockSummary(query) {
+  return request({
+    url: '/beverage/stock/summary',
+    method: 'get',
+    params: query
+  })
+}
+
 // 新增库存流水
 export function addStock(data) {
   return request({
