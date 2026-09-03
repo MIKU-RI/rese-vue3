@@ -97,7 +97,7 @@
         <el-row>
           <el-col :span="12">
             <el-form-item label="退货类型" prop="returnType">
-              <el-radio-group v-model="form.returnType" @change="onTypeChange">
+              <el-radio-group v-model="form.returnType" @change="onTypeChange" :disabled="sourceLocked">
                 <el-radio-button value="1">采购退货</el-radio-button>
                 <el-radio-button value="2">销售退货</el-radio-button>
               </el-radio-group>
@@ -112,7 +112,7 @@
         <el-row>
           <el-col :span="12">
             <el-form-item :label="isPurchaseReturn ? '供应商' : '客户'" prop="partnerId">
-              <el-select v-model="form.partnerId" :placeholder="'请选择' + (isPurchaseReturn ? '供应商' : '客户')" filterable style="width:100%" @change="onPartnerChange">
+              <el-select v-model="form.partnerId" :placeholder="'请选择' + (isPurchaseReturn ? '供应商' : '客户')" filterable style="width:100%" @change="onPartnerChange" :disabled="sourceLocked">
                 <el-option v-if="isPurchaseReturn" v-for="s in supplierOptions" :key="s.supplierId" :label="s.supplierName" :value="s.supplierId" />
                 <el-option v-else v-for="c in customerOptions" :key="c.customerId" :label="c.customerName" :value="c.customerId" />
               </el-select>
@@ -141,6 +141,7 @@
                 <el-select v-model="form.sourceId" placeholder="（可选）选已入库/已出库单据，自动带出明细" clearable filterable style="width:100%" @change="onSourceChange" :disabled="loadingSource">
                   <el-option v-for="s in sourceOptions" :key="s.id" :label="s.label" :value="s.id" />
                 </el-select>
+                <div v-if="sourceLocked" style="color:#909399;font-size:12px;margin-top:4px;">已根据来源单自动带出往来单位与明细，均不可修改（仅数量可调整，不超过原单）。</div>
               </template>
               <template v-else>
                 <span>{{ form.sourceNo || '（无关联原单）' }}</span>
@@ -149,12 +150,12 @@
           </el-col>
         </el-row>
 
-        <el-divider content-position="left">退货明细（规格/单位/单价由商品档案带出，不可修改）</el-divider>
-        <el-button type="primary" plain icon="Plus" size="small" @click="addItem" style="margin-bottom:8px">添加明细</el-button>
+        <el-divider content-position="left">退货明细（已按来源单带出，规格/单位/单价不可修改，数量可调整）</el-divider>
+        <el-button v-if="!sourceLocked" type="primary" plain icon="Plus" size="small" @click="addItem" style="margin-bottom:8px">添加明细</el-button>
         <el-table :data="form.items" border>
           <el-table-column label="商品" min-width="180">
             <template #default="scope">
-              <el-select v-model="scope.row.productId" placeholder="选择商品" filterable style="width:100%" @change="(val) => onProductChange(scope.row, val)">
+              <el-select v-model="scope.row.productId" placeholder="选择商品" filterable style="width:100%" @change="(val) => onProductChange(scope.row, val)" :disabled="sourceLocked">
                 <el-option v-for="p in productOptions" :key="p.productId" :label="p.productName" :value="p.productId" />
               </el-select>
             </template>
@@ -176,7 +177,7 @@
           </el-table-column>
           <el-table-column v-if="!isPurchaseReturn" label="折扣%" width="110">
             <template #default="scope">
-              <el-input-number v-model="scope.row.discount" :min="1" :max="100" :precision="0" :controls-position="'right'" style="width:100%" @change="recalc" />
+              <el-input-number v-model="scope.row.discount" :min="1" :max="100" :precision="0" :controls-position="'right'" style="width:100%" @change="recalc" :disabled="sourceLocked" />
             </template>
           </el-table-column>
           <el-table-column :label="isPurchaseReturn ? '金额' : '实收金额'" width="115" align="center">
@@ -184,7 +185,7 @@
           </el-table-column>
           <el-table-column label="操作" width="70" align="center">
             <template #default="scope">
-              <el-button link type="danger" icon="Delete" @click="removeItem(scope.$index)" />
+              <el-button link type="danger" icon="Delete" @click="removeItem(scope.$index)" :disabled="sourceLocked" />
             </template>
           </el-table-column>
         </el-table>
@@ -259,6 +260,9 @@ function loadProducts() {
 
 const isPurchaseReturn = computed(() => form.value.returnType === '1')
 
+// 选中来源单据后（新增态）进入「锁定」态：往来单位/明细等自动带出且不可再手工修改
+const sourceLocked = computed(() => open.value && !form.value.returnId && !!form.value.sourceId)
+
 function onTypeChange() {
   // 切换类型：仅清空往来单位/来源与明细（价格口径由 onProductChange 按新类型带出），
   // 不能 resetForm——会把 returnType 重置回首次挂载值，导致无法选中「销售退货」
@@ -326,6 +330,13 @@ function onSourceChange(sourceId) {
   if (!sourceId) {
     form.value.sourceId = undefined
     form.value.sourceNo = undefined
+    form.value.supplierId = undefined
+    form.value.supplierName = undefined
+    form.value.customerId = undefined
+    form.value.customerName = undefined
+    form.value.partnerId = undefined
+    form.value.items = []
+    proxy.$refs.returnRef && proxy.$refs.returnRef.clearValidate(['partnerId'])
     return
   }
   loadingSource.value = true
