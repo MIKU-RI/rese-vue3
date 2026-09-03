@@ -59,6 +59,7 @@
           <i class="lg lg-pr"></i>采购退货
           <i class="lg lg-sr"></i>销售退货
           <i class="lg lg-man"></i>手动/盘点
+          <i class="lg lg-rev"></i>撤销/冲销
         </span>
       </el-col>
       <right-toolbar v-model:showSearch="showSearch" @queryTable="getList"></right-toolbar>
@@ -75,9 +76,12 @@
           <el-tag :type="sourceInfo(scope.row).tagType" effect="light" size="small">{{ sourceInfo(scope.row).label }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="变动" align="center" width="120">
+      <el-table-column label="变动" align="center" width="130">
         <template #default="scope">
-          <span :style="{ color: changeColor(scope.row.changeType), fontWeight: 600 }">
+          <span :style="{ color: changeColor(scope.row), fontWeight: isReverseRow(scope.row) ? 400 : 600, textDecoration: isReverseRow(scope.row) ? 'line-through' : 'none' }">
+            <template v-if="isReverseRow(scope.row)">
+              <span style="font-size:11px;color:#909399;margin-right:2px">撤销</span>
+            </template>
             {{ scope.row.changeType === '0' ? '+' : scope.row.changeType === '1' ? '−' : '±' }}{{ scope.row.changeQty }} {{ scope.row.unit }}
           </span>
         </template>
@@ -287,24 +291,31 @@ function parseRefType(refNo) {
 }
 
 const SOURCE_META = {
-  purchase:       { label: '采购入库', tagType: 'success' },
-  sale:           { label: '销售出库', tagType: 'danger' },
-  purchaseReturn: { label: '采购退货', tagType: 'warning' },
-  saleReturn:     { label: '销售退货', tagType: 'warning' },
-  manual:         { label: '手动/盘点', tagType: 'info' }
+  purchase:       { label: '采购入库', tagType: 'success', reverseLabel: '撤销采购入库' },
+  sale:           { label: '销售出库', tagType: 'danger',  reverseLabel: '撤销销售出库' },
+  purchaseReturn: { label: '采购退货', tagType: 'warning', reverseLabel: '撤销采购退货' },
+  saleReturn:     { label: '销售退货', tagType: 'warning', reverseLabel: '撤销销售退货' },
+  manual:         { label: '手动/盘点', tagType: 'info',   reverseLabel: '撤销手动调整' }
+}
+
+function isReverseRow(row) {
+  return row.actionType === 'reverse' || (row.remark && (row.remark.includes('作废') || row.remark.includes('冲销')))
 }
 
 function sourceInfo(row) {
+  const reverse = isReverseRow(row)
   let type = parseRefType(row.refNo)
   if (type === 'manual' && row.changeType === '2') {
-    return { type, label: '盘点', tagType: 'info' }
+    return { type, label: reverse ? '撤销盘点' : '盘点', tagType: 'info', reverse }
   }
-  return { type, ...SOURCE_META[type] }
+  const meta = SOURCE_META[type] || SOURCE_META.manual
+  return { type, label: reverse ? (meta.reverseLabel || ('撤销' + meta.label)) : meta.label, tagType: reverse ? 'info' : meta.tagType, reverse }
 }
 
-function changeColor(changeType) {
-  if (changeType === '0') return '#67C23A'   // 入库 绿
-  if (changeType === '1') return '#F56C6C'   // 出库 红
+function changeColor(row) {
+  if (isReverseRow(row)) return '#909399'    // 撤销/冲销 灰
+  if (row.changeType === '0') return '#67C23A'   // 入库 绿
+  if (row.changeType === '1') return '#F56C6C'   // 出库 红
   return '#909399'                          // 盘点 灰
 }
 
@@ -502,6 +513,7 @@ onMounted(() => {
 .lg-pr { background: #E6A23C; }
 .lg-sr { background: #E6A23C; }
 .lg-man { background: #909399; }
+.lg-rev { background: #C0C4CC; }
 
 .overview-card { margin-bottom: 14px; }
 .overview-header { display: flex; justify-content: space-between; align-items: center; font-weight: 600; }
