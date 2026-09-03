@@ -335,6 +335,7 @@ function onSourceChange(sourceId) {
       form.value.sourceNo = d.purchaseNo
       form.value.supplierId = d.supplierId
       form.value.supplierName = d.supplierName
+      form.value.partnerId = d.supplierId
       form.value.customerId = undefined
       form.value.customerName = undefined
       form.value.items = (d.items || []).map(it => ({
@@ -350,6 +351,7 @@ function onSourceChange(sourceId) {
       form.value.sourceNo = d.saleNo
       form.value.customerId = d.customerId
       form.value.customerName = d.customerName
+      form.value.partnerId = d.customerId
       form.value.supplierId = undefined
       form.value.supplierName = undefined
       form.value.items = (d.items || []).map(it => ({
