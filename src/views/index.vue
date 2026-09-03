@@ -1,5 +1,11 @@
 <template>
   <div class="app-container home">
+    <!-- 仪表盘标题与刷新 -->
+    <div class="dash-header">
+      <div class="dash-title">经营仪表盘</div>
+      <el-button :loading="refreshing" icon="Refresh" @click="refresh">刷新数据</el-button>
+    </div>
+
     <!-- KPI 卡片 -->
     <el-row :gutter="16">
       <el-col :xs="12" :sm="12" :md="6" :lg="6" v-for="kpi in kpis" :key="kpi.label">
@@ -89,6 +95,7 @@ import { getDashboard } from '@/api/beverage/dashboard'
 
 const router = useRouter()
 const dashboard = ref({})
+const refreshing = ref(false)
 const lowStock = computed(() => dashboard.value.lowStock || [])
 
 const quickLinks = ref([
@@ -224,6 +231,7 @@ function resizeAll() {
 }
 
 async function loadDashboard() {
+  refreshing.value = true
   try {
     const res = await getDashboard()
     dashboard.value = res.data || {}
@@ -232,6 +240,11 @@ async function loadDashboard() {
   }
   await nextTick()
   charts = [renderTrend(), renderStock(), renderTop(), renderCat()]
+  refreshing.value = false
+}
+
+function refresh() {
+  loadDashboard()
 }
 
 onMounted(() => {
@@ -248,6 +261,17 @@ onBeforeUnmount(() => {
 <style scoped lang="scss">
 .home {
   background: transparent;
+}
+.dash-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.dash-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #303133;
 }
 .kpi-card {
   margin-bottom: 4px;

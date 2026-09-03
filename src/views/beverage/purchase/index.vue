@@ -53,7 +53,7 @@
         <template #default="scope">
           <el-button link type="primary" icon="View" @click="handleDetail(scope.row)">明细</el-button>
           <el-button v-if="scope.row.status === '0'" link type="success" icon="Bottom" @click="handleInbound(scope.row)" v-hasPermi="['beverage:purchase:edit']">入库</el-button>
-          <el-button v-if="scope.row.status === '1'" link type="danger" icon="RefreshLeft" @click="goReturn(scope.row)" v-hasPermi="['beverage:return:add']">退货</el-button>
+          <el-button v-if="scope.row.status === '1'" link type="danger" icon="RefreshLeft" @click="goReturn(scope.row)" :disabled="returning" v-hasPermi="['beverage:return:add']">退货</el-button>
           <el-button v-if="scope.row.status === '1' && isAdmin" link type="warning" icon="Top" @click="handleReverseInbound(scope.row)" v-hasPermi="['beverage:purchase:edit']">撤销入库</el-button>
           <el-button v-if="scope.row.status === '0' || isAdmin" link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['beverage:purchase:edit']">修改</el-button>
           <el-button v-if="scope.row.status === '0' || isAdmin" link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['beverage:purchase:remove']">删除</el-button>
@@ -363,12 +363,15 @@ function handleReverseInbound(row) {
 }
 
 // 一键退货：自动按原采购单生成「采购退货单」并联动库存，无需手动填写表单
+const returning = ref(false)
 function goReturn(row) {
+  if (returning.value) return
   proxy.$modal.confirm('确认对采购单「' + row.purchaseNo + '」执行退货？将自动生成采购退货单并扣减库存（退回全部商品）。').then(() => {
+    returning.value = true
     autoCreateReturn({ returnType: '1', sourceId: row.purchaseId }).then(() => {
       proxy.$modal.msgSuccess('退货单已自动创建并执行')
       getList()
-    })
+    }).catch(() => {}).finally(() => { returning.value = false })
   }).catch(() => {})
 }
 

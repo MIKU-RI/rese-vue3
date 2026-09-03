@@ -191,7 +191,7 @@
       </el-form>
       <template #footer>
         <div class="dialog-footer">
-          <el-button type="primary" @click="submitForm">确 定</el-button>
+          <el-button type="primary" @click="submitForm" :disabled="submitting">确 定</el-button>
           <el-button @click="cancel">取 消</el-button>
         </div>
       </template>
@@ -244,6 +244,8 @@ const productOptions = ref([])
 // 关联原单下拉（已入库采购单 / 已出库销售单）
 const sourceOptions = ref([])
 const loadingSource = ref(false)
+// 提交中标记：防止新增/修改退货单时重复点击导致并发重复提交
+const submitting = ref(false)
 
 function loadSuppliers() {
   listSupplier({ pageNum: 1, pageSize: 10000 }).then(res => { supplierOptions.value = res.rows || [] })
@@ -590,17 +592,19 @@ function submitForm() {
       if (form.value.returnType === '1') { payload.customerId = undefined; payload.customerName = undefined }
       else { payload.supplierId = undefined; payload.supplierName = undefined }
       if (form.value.returnId != undefined) {
+        submitting.value = true
         updateReturn(payload).then(() => {
           proxy.$modal.msgSuccess("修改成功")
           open.value = false
           getList()
-        })
+        }).catch(() => {}).finally(() => { submitting.value = false })
       } else {
+        submitting.value = true
         addReturn(payload).then(() => {
           proxy.$modal.msgSuccess("新增成功")
           open.value = false
           getList()
-        })
+        }).catch(() => {}).finally(() => { submitting.value = false })
       }
     }
   })
