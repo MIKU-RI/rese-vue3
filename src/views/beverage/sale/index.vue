@@ -168,6 +168,7 @@
 import { listSale, getSale, delSale, addSale, updateSale } from "@/api/beverage/sale"
 import { listCustomer } from "@/api/beverage/customer"
 import { listProduct } from "@/api/beverage/product"
+import { autoCreateReturn } from "@/api/beverage/return"
 import { parseTime } from "@/utils/ruoyi"
 import useUserStore from '@/store/modules/user'
 
@@ -367,12 +368,14 @@ function handleReverseOutbound(row) {
   }).catch(() => {})
 }
 
-// 跳转到退货单页并携带来源销售单，自动带出该单明细生成「销售退货」
+// 一键退货：自动按原销售单生成「销售退货单」并联动库存，无需手动填写表单
 function goReturn(row) {
-  proxy.$router.push({
-    path: '/beverage/return',
-    query: { sourceType: '2', sourceId: row.saleId, sourceNo: row.saleNo }
-  })
+  proxy.$modal.confirm('确认对销售单「' + row.saleNo + '」执行退货？将自动生成销售退货单并回补库存（退回全部商品）。').then(() => {
+    autoCreateReturn({ returnType: '2', sourceId: row.saleId }).then(() => {
+      proxy.$modal.msgSuccess('退货单已自动创建并执行')
+      getList()
+    })
+  }).catch(() => {})
 }
 
 function submitForm() {

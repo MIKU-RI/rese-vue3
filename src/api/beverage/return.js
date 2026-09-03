@@ -43,3 +43,12 @@ export function delReturn(returnIds) {
     method: 'delete'
   })
 }
+
+// 从采购/销售原单一键自动创建退货单
+export function autoCreateReturn(data) {
+  return request({
+    url: '/beverage/return/autoFromSource',
+    method: 'post',
+    data: data
+  })
+}

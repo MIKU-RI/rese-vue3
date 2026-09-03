@@ -111,7 +111,7 @@
         </el-row>
         <el-row>
           <el-col :span="12">
-            <el-form-item :label="isPurchaseReturn ? '供应商' : '客户'" prop="partnerName">
+            <el-form-item :label="isPurchaseReturn ? '供应商' : '客户'" prop="partnerId">
               <el-select v-model="form.partnerId" :placeholder="'请选择' + (isPurchaseReturn ? '供应商' : '客户')" filterable style="width:100%" @change="onPartnerChange">
                 <el-option v-if="isPurchaseReturn" v-for="s in supplierOptions" :key="s.supplierId" :label="s.supplierName" :value="s.supplierId" />
                 <el-option v-else v-for="c in customerOptions" :key="c.customerId" :label="c.customerName" :value="c.customerId" />
@@ -268,7 +268,7 @@ function onTypeChange() {
   form.value.sourceId = undefined
   form.value.sourceNo = undefined
   form.value.items = []
-  if (proxy.$refs.returnRef) proxy.$refs.returnRef.clearValidate(['partnerName', 'returnDate'])
+  if (proxy.$refs.returnRef) proxy.$refs.returnRef.clearValidate(['partnerId', 'returnDate'])
   // 新增态下刷新来源单下拉
   if (open.value && !form.value.returnId) reloadSourceOptions()
 }
@@ -361,7 +361,7 @@ function onSourceChange(sourceId) {
       done()
     }).catch(done)
   }
-  proxy.$refs.returnRef && proxy.$refs.returnRef.clearValidate(['partnerName'])
+  proxy.$refs.returnRef && proxy.$refs.returnRef.clearValidate(['partnerId'])
 }
 
 // 供其它页面跳转带参进入：sourceType=1采购退货/2销售退货 + sourceId/sourceNo
@@ -413,7 +413,7 @@ const data = reactive({
   rules: {
     returnType: [{ required: true, message: "退货类型不能为空", trigger: "change" }],
     returnDate: [{ required: true, message: "退货日期不能为空", trigger: "change" }],
-    partnerName: [{ required: true, message: "往来单位不能为空", trigger: "blur" }]
+    partnerId: [{ required: true, message: "往来单位不能为空", trigger: "change" }]
   }
 })
 
