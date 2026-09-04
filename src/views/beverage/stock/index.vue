@@ -39,6 +39,11 @@
           <el-option v-for="dict in typeOptions" :key="dict.value" :label="dict.label" :value="dict.value" />
         </el-select>
       </el-form-item>
+      <el-form-item label=" ">
+        <el-checkbox :model-value="queryParams.includeDeleted === '1'" @change="v => { queryParams.includeDeleted = v ? '1' : '0'; handleQuery() }">
+          显示来源单已删除的流水
+        </el-checkbox>
+      </el-form-item>
       <el-form-item>
         <el-button type="primary" icon="Search" @click="handleQuery">搜索</el-button>
         <el-button icon="Refresh" @click="resetQuery">重置</el-button>
@@ -87,9 +92,13 @@
         </template>
       </el-table-column>
       <el-table-column label="变动后库存" align="center" prop="afterQty" width="100" />
-      <el-table-column label="关联单号" align="center" width="170">
+      <el-table-column label="关联单号" align="center" width="190">
         <template #default="scope">
-          <el-link v-if="scope.row.refNo" type="primary" :underline="false" @click="openRefDetail(scope.row.refNo)">
+          <template v-if="scope.row.refStatus === '1'">
+            <span style="color:#c0c4cc;text-decoration:line-through">{{ scope.row.refNo }}</span>
+            <el-tag type="info" effect="plain" size="small" style="margin-left:4px">来源单已删除</el-tag>
+          </template>
+          <el-link v-else-if="scope.row.refNo" type="primary" :underline="false" @click="openRefDetail(scope.row.refNo)">
             {{ scope.row.refNo }} <el-icon><Right /></el-icon>
           </el-link>
           <span v-else style="color:#c0c4cc">— 手动 —</span>
@@ -270,7 +279,9 @@ const data = reactive({
     productName: undefined,
     brand: undefined,
     changeType: undefined,
-    refType: undefined
+    refType: undefined,
+    // 默认隐藏「来源单已删除」的无效流水，'1' 勾选后显示（数据仍保留，保证可追溯）
+    includeDeleted: '0'
   },
   rules: {
     productName: [{ required: true, message: "商品名称不能为空", trigger: "blur" }],
@@ -304,12 +315,15 @@ function isReverseRow(row) {
 
 function sourceInfo(row) {
   const reverse = isReverseRow(row)
+  const deleted = row.refStatus === '1'
   let type = parseRefType(row.refNo)
   if (type === 'manual' && row.changeType === '2') {
-    return { type, label: reverse ? '撤销盘点' : '盘点', tagType: 'info', reverse }
+    return { type, label: reverse ? '撤销盘点' : '盘点', tagType: 'info', reverse, deleted }
   }
   const meta = SOURCE_META[type] || SOURCE_META.manual
-  return { type, label: reverse ? (meta.reverseLabel || ('撤销' + meta.label)) : meta.label, tagType: reverse ? 'info' : meta.tagType, reverse }
+  const label = reverse ? (meta.reverseLabel || ('撤销' + meta.label)) : meta.label
+  // 来源单已被删除：统一置灰，避免客户误以为该流水仍可追溯到有效单据
+  return { type, label: deleted ? '已失效' : label, tagType: deleted || reverse ? 'info' : meta.tagType, reverse, deleted }
 }
 
 function changeColor(row) {
@@ -348,6 +362,7 @@ function handleQuery() {
 function resetQuery() {
   proxy.resetForm("queryRef")
   queryParams.value.refType = undefined
+  queryParams.value.includeDeleted = '0'
   handleQuery()
 }
 
