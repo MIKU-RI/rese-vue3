@@ -610,7 +610,8 @@ function submitForm() {
         proxy.$modal.msgWarning("请至少添加一条明细")
         return
       }
-      if (!form.value.items.some(it => it.productId != undefined)) {
+      // 兼容历史数据：product_id 缺失时允许按商品名称提交（后端会按名称回退匹配）
+      if (!form.value.items.some(it => it.productId != undefined || it.productName)) {
         proxy.$modal.msgWarning("请为明细选择商品")
         return
       }
