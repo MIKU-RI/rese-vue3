@@ -31,7 +31,7 @@
     <el-row :gutter="16" class="mt16">
       <el-col :xs="24" :sm="24" :md="12" :lg="12">
         <el-card shadow="hover">
-          <template #header><span class="card-title">近 7 日进销趋势</span></template>
+          <template #header><span class="card-title">近 7 日进销趋势（净额 · 已扣退货）</span></template>
           <div ref="trendChart" class="chart"></div>
         </el-card>
       </el-col>
@@ -146,13 +146,13 @@ function renderTrend() {
   const c = echarts.init(trendChart.value)
   c.setOption({
     tooltip: { trigger: 'axis' },
-    legend: { data: ['进货额', '销售额'] },
+    legend: { data: ['净进货额', '净销售额'] },
     grid: { left: 60, right: 20, top: 40, bottom: 30 },
     xAxis: { type: 'category', data: t.dates },
     yAxis: { type: 'value' },
     series: [
-      { name: '进货额', type: 'line', smooth: true, data: t.purchase, areaStyle: { opacity: 0.08 } },
-      { name: '销售额', type: 'line', smooth: true, data: t.sale, areaStyle: { opacity: 0.08 } }
+      { name: '净进货额', type: 'line', smooth: true, data: t.purchase, areaStyle: { opacity: 0.08 } },
+      { name: '净销售额', type: 'line', smooth: true, data: t.sale, areaStyle: { opacity: 0.08 } }
     ]
   })
   return c
