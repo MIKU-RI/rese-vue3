@@ -41,11 +41,6 @@
           <el-option v-for="dict in typeOptions" :key="dict.value" :label="dict.label" :value="dict.value" />
         </el-select>
       </el-form-item>
-      <el-form-item class="no-label">
-        <el-checkbox :model-value="queryParams.includeDeleted === '1'" @change="v => { queryParams.includeDeleted = v ? '1' : '0'; handleQuery() }">
-          显示已删除来源
-        </el-checkbox>
-      </el-form-item>
       <el-form-item>
         <el-button type="primary" icon="Search" @click="handleQuery">搜索</el-button>
         <el-button icon="Refresh" @click="resetQuery">重置</el-button>
@@ -104,12 +99,12 @@
           <span v-else style="color:#c0c4cc">— 手动 —</span>
         </template>
       </el-table-column>
-      <el-table-column label="时间" align="center" prop="createTime" width="150">
+      <el-table-column label="时间" align="center" prop="createTime" width="145">
         <template #default="scope"><span>{{ parseTime(scope.row.createTime, '{y}-{m}-{d} {h}:{i}') }}</span></template>
       </el-table-column>
-      <el-table-column label="操作" align="center" width="70" class-name="small-padding fixed-width">
+      <el-table-column label="操作人" align="center" width="95">
         <template #default="scope">
-          <el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['beverage:stock:remove']">删除</el-button>
+          <span>{{ scope.row.createByNickName || scope.row.createBy || '—' }}</span>
         </template>
       </el-table-column>
     </el-table>
@@ -279,9 +274,7 @@ const data = reactive({
     productName: undefined,
     brand: undefined,
     changeType: undefined,
-    refType: undefined,
-    // 默认隐藏「来源单已删除」的无效流水，'1' 勾选后显示（数据仍保留，保证可追溯）
-    includeDeleted: '0'
+    refType: undefined
   },
   rules: {
     productName: [{ required: true, message: "商品名称不能为空", trigger: "blur" }],
@@ -362,7 +355,6 @@ function handleQuery() {
 function resetQuery() {
   proxy.resetForm("queryRef")
   queryParams.value.refType = undefined
-  queryParams.value.includeDeleted = '0'
   handleQuery()
 }
 
