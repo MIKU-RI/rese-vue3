@@ -29,6 +29,17 @@
                   @click.stop="goBrandPrice(b.brand)"
                 >调价</el-button>
               </el-tooltip>
+              <el-tooltip content="进入该品牌调库存" placement="top">
+                <el-button
+                  class="brand-item__stock"
+                  size="small"
+                  type="success"
+                  link
+                  icon="Box"
+                  @click.stop="goBrandStock(b.brand)"
+                  v-hasPermi="['beverage:product:stock']"
+                >调库存</el-button>
+              </el-tooltip>
             </li>
             <li v-if="brandList.length === 0" class="brand-item brand-item--empty">暂无品牌</li>
           </ul>
@@ -60,6 +71,7 @@
             <div class="toolbar__right">
               <el-button icon="Refresh" @click="getList">刷新</el-button>
               <el-button type="warning" plain icon="Money" @click="goBrandPrice()">品牌调价</el-button>
+              <el-button type="success" plain icon="Box" @click="goBrandStock()" v-hasPermi="['beverage:product:stock']">品牌库存</el-button>
               <el-button type="primary" icon="Plus" @click="handleAdd" v-hasPermi="['beverage:product:add']">新增商品</el-button>
             </div>
           </div>
@@ -81,6 +93,7 @@
               <span v-if="isLow(p)" class="product-card__warn">库存预警</span>
               <div class="product-card__actions" @click.stop>
                 <el-button size="small" type="primary" link icon="Edit" @click="handleUpdate(p)" v-hasPermi="['beverage:product:edit']">修改</el-button>
+                <el-button size="small" type="success" link icon="Box" @click="openStockAdjust(p)" v-hasPermi="['beverage:product:stock']">调库存</el-button>
                 <el-button size="small" type="danger" link icon="Delete" @click="handleDelete(p)" v-hasPermi="['beverage:product:remove']">删除</el-button>
               </div>
             </div>
@@ -138,6 +151,7 @@
         </el-descriptions>
       </div>
       <template #footer>
+        <el-button icon="Box" type="success" @click="openStockAdjust(current)" v-hasPermi="['beverage:product:stock']">调整库存</el-button>
         <el-button icon="Edit" @click="handleUpdate(current)" v-hasPermi="['beverage:product:edit']">修改</el-button>
         <el-button icon="Delete" type="danger" @click="handleDelete(current)" v-hasPermi="['beverage:product:remove']">删除</el-button>
       </template>
@@ -197,14 +211,10 @@
             </el-row>
             <el-row>
               <el-col :span="12">
-                <el-form-item label="库存数量" prop="stock">
-                  <el-input-number v-model="form.stock" :min="0" :step="1" :precision="0" :controls-position="'right'" style="width: 100%" />
-                </el-form-item>
-              </el-col>
-              <el-col :span="12">
                 <el-form-item label="预警阈值" prop="warnStock">
                   <el-input-number v-model="form.warnStock" :min="0" :step="1" :precision="0" :controls-position="'right'" style="width: 100%" />
                 </el-form-item>
+                <div class="form-tip">库存数量请通过「调整库存」功能修改，系统会自动生成库存台账记录</div>
               </el-col>
             </el-row>
             <el-form-item label="状态">
@@ -231,20 +241,52 @@
         </div>
       </template>
     </el-dialog>
+
+    <!-- 调整库存（单品，生成库存台账记录，仅超管） -->
+    <el-dialog title="调整库存" v-model="stockOpen" width="460px" append-to-body @closed="stockTarget = null">
+      <div v-if="stockTarget" class="stock-adjust">
+        <div class="stock-adjust__head">
+          <b>{{ stockTarget.productName }}</b>
+          <span class="stock-adjust__meta">{{ stockTarget.spec }} / {{ stockTarget.unit }}</span>
+        </div>
+        <el-descriptions :column="1" border size="small" style="margin: 12px 0">
+          <el-descriptions-item label="当前库存">{{ stockTarget.stock }} {{ stockTarget.unit }}</el-descriptions-item>
+        </el-descriptions>
+        <el-form label-width="92px">
+          <el-form-item label="调整后库存">
+            <el-input-number v-model="stockTarget.newStock" :min="0" :step="1" :precision="0" :controls-position="'right'" style="width: 100%" />
+            <div class="form-tip">本次变动：{{ stockDelta > 0 ? '+' : '' }}{{ stockDelta }} {{ stockTarget.unit }}；保存后会生成一条「盘点」库存台账记录</div>
+          </el-form-item>
+        </el-form>
+      </div>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button type="primary" @click="submitStockAdjust">确 定</el-button>
+          <el-button @click="stockOpen = false">取 消</el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup name="BeverageProduct">
-import { listProduct, getProduct, delProduct, addProduct, updateProduct } from "@/api/beverage/product"
+import { listProduct, getProduct, delProduct, addProduct, updateProduct, updateProductStock } from "@/api/beverage/product"
 import ImageUpload from "@/components/ImageUpload"
 import { useDict } from "@/utils/dict"
 import { isExternal } from "@/utils/validate"
+import useUserStore from "@/store/modules/user"
 
 const { proxy } = getCurrentInstance()
 const baseUrl = import.meta.env.VITE_APP_BASE_API
 
 // 品牌字典（饮料品牌，可在 系统管理→字典管理 配置）
 const { beverage_brand } = useDict('beverage_brand')
+
+// 库存调整权限：仅超管（*:*:* 或 beverage:product:stock）
+const hasStockPerm = computed(() => {
+  const perms = useUserStore().permissions || []
+  return perms.some(p => p === '*:*:*' || p === 'beverage:product:stock')
+})
 
 const productList = ref([])      // 全量
 const filteredList = ref([])     // 过滤后展示
@@ -312,6 +354,11 @@ function formatMoney(val) {
 // 进入品牌单价管理：不传 brand 时打开品牌列表，传入则直达该品牌价格表
 function goBrandPrice(brand) {
   proxy.$router.push({ path: '/beverage/brandPrice', query: brand ? { brand } : {} })
+}
+
+// 进入品牌库存管理：不传 brand 时打开品牌列表，传入则直达该品牌库存表
+function goBrandStock(brand) {
+  proxy.$router.push({ path: '/beverage/brandStock', query: brand ? { brand } : {} })
 }
 
 function applyFilter() {
@@ -412,7 +459,10 @@ function submitForm() {
   proxy.$refs["productRef"].validate(valid => {
     if (valid) {
       if (form.value.productId != undefined) {
-        updateProduct(form.value).then(() => {
+        // 编辑：库存统一通过「调整库存」修改并生成台账，此处剔除 stock 避免静默改库存
+        const payload = { ...form.value }
+        delete payload.stock
+        updateProduct(payload).then(() => {
           proxy.$modal.msgSuccess("修改成功")
           open.value = false
           getList()
@@ -426,6 +476,43 @@ function submitForm() {
       }
     }
   })
+}
+
+/* ---------------- 调整库存（单品，生成台账） ---------------- */
+const stockOpen = ref(false)
+const stockTarget = ref(null)
+const stockDelta = computed(() => {
+  if (!stockTarget.value) return 0
+  return (Number(stockTarget.value.newStock) || 0) - (Number(stockTarget.value.stock) || 0)
+})
+function openStockAdjust(row) {
+  const id = row && row.productId ? row.productId : (current.value ? current.value.productId : undefined)
+  if (!id) return
+  detailOpen.value = false
+  getProduct(id).then(res => {
+    const p = res.data
+    stockTarget.value = { ...p, newStock: Number(p.stock) || 0 }
+    stockOpen.value = true
+  })
+}
+function submitStockAdjust() {
+  if (!stockTarget.value) return
+  const target = Number(stockTarget.value.newStock) || 0
+  if (target < 0) {
+    proxy.$modal.msgError("库存不能为负数")
+    return
+  }
+  const id = stockTarget.value.productId
+  const current = Number(stockTarget.value.stock) || 0
+  if (target === current) {
+    proxy.$modal.msgWarning("库存没有变化")
+    return
+  }
+  updateProductStock([{ productId: id, stock: target }]).then(() => {
+    proxy.$modal.msgSuccess("已调整库存并生成台账记录")
+    stockOpen.value = false
+    getList()
+  }).catch(() => {})
 }
 
 watch(activeBrand, applyFilter)
@@ -480,6 +567,8 @@ onMounted(() => {
         }
         &__price { flex: none; margin-left: 6px; display: none; }
         &:hover &__price { display: inline-flex; }
+        &__stock { flex: none; margin-left: 2px; display: none; }
+        &:hover &__stock { display: inline-flex; }
         &--empty { color: var(--el-text-color-secondary); cursor: default; justify-content: center; }
       }
     }
@@ -570,6 +659,11 @@ onMounted(() => {
   }
 
   .empty-tip { grid-column: 1 / -1; padding: 40px 0; }
+
+  .stock-adjust {
+    &__head { display: flex; align-items: baseline; gap: 8px; font-size: 14px; }
+    &__meta { font-size: 12px; color: var(--el-text-color-secondary); }
+  }
 
   .detail {
     &__media { text-align: center; margin-bottom: 16px; }

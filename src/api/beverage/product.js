@@ -62,6 +62,15 @@ export function updateBrandPrice(data) {
   })
 }
 
+// 批量保存商品库存（库存调整，生成库存台账记录，仅超管）
+export function updateProductStock(data) {
+  return request({
+    url: '/beverage/product/stock',
+    method: 'put',
+    data: data
+  })
+}
+
 // 删除饮料商品
 export function delProduct(productIds) {
   return request({
