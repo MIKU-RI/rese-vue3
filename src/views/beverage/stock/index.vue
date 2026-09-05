@@ -1,47 +1,49 @@
 <template>
-  <div class="app-container">
-    <!-- 库存概览：让客户一眼看到每个商品当前还剩多少 -->
-    <el-card class="overview-card" shadow="never">
-      <template #header>
-        <div class="overview-header">
-          <span><el-icon><Box /></el-icon> 库存概览（当前库存）</span>
-          <span class="overview-sub">共 {{ summaryList.length }} 个商品 · 合计 {{ totalStockQty }} 件/箱</span>
-        </div>
-      </template>
-      <div v-loading="summaryLoading" class="overview-body">
-        <div v-if="summaryList.length === 0" class="empty-tip">暂无库存数据</div>
-        <div v-for="s in summaryList" :key="s.productId" class="ov-item" @click="filterByProduct(s.productName)">
-          <div class="ov-name" :title="s.productName">{{ s.productName }}</div>
+  <div class="app-container stock-page">
+    <!-- 库存概览：紧凑条带，一眼看到每个商品当前还剩多少 -->
+    <div class="overview-strip" v-loading="summaryLoading">
+      <div class="ov-head">
+        <span class="ov-title"><el-icon><Box /></el-icon> 库存概览</span>
+        <span class="ov-sub">{{ summaryList.length }} 个商品 · 合计 {{ totalStockQty }} 件/箱 · 点击商品可筛选流水</span>
+      </div>
+      <div v-if="summaryList.length === 0" class="empty-tip">暂无库存数据</div>
+      <div v-else class="ov-list">
+        <div v-for="s in summaryList" :key="s.productId" class="ov-item"
+             :class="{ active: queryParams.productName === s.productName }"
+             @click="filterByProduct(s.productName)">
+          <div class="ov-top">
+            <span class="ov-name" :title="s.productName">{{ s.productName }}</span>
+            <span class="ov-qty">{{ s.currentQty }}<i>{{ s.unit }}</i></span>
+          </div>
           <div class="ov-spec">{{ s.spec }} / {{ s.unit }}</div>
-          <div class="ov-qty">{{ s.currentQty }}<span class="ov-unit">{{ s.unit }}</span></div>
         </div>
       </div>
-    </el-card>
+    </div>
 
-    <el-form :model="queryParams" ref="queryRef" :inline="true" v-show="showSearch" label-width="68px">
-      <el-form-item label="商品名称" prop="productName">
-        <el-select v-model="queryParams.productName" placeholder="全部商品" clearable filterable style="width: 200px" @change="handleQuery">
+    <el-form :model="queryParams" ref="queryRef" :inline="true" v-show="showSearch" label-width="60px" class="query-form">
+      <el-form-item label="商品" prop="productName">
+        <el-select v-model="queryParams.productName" placeholder="全部商品" clearable filterable style="width: 170px" @change="handleQuery">
           <el-option v-for="p in productOptions" :key="p.productId" :label="p.productName" :value="p.productName" />
         </el-select>
       </el-form-item>
       <el-form-item label="品牌" prop="brand">
-        <el-select v-model="queryParams.brand" placeholder="全部品牌" clearable filterable style="width: 160px" @change="handleQuery">
+        <el-select v-model="queryParams.brand" placeholder="全部品牌" clearable filterable style="width: 140px" @change="handleQuery">
           <el-option v-for="o in beverage_brand" :key="o.value" :label="o.label" :value="o.value" />
         </el-select>
       </el-form-item>
-      <el-form-item label="来源类型" prop="refType">
-        <el-select v-model="queryParams.refType" placeholder="全部来源" clearable style="width: 160px" @change="handleQuery">
+      <el-form-item label="来源" prop="refType">
+        <el-select v-model="queryParams.refType" placeholder="全部来源" clearable style="width: 130px" @change="handleQuery">
           <el-option v-for="o in sourceOptions" :key="o.value" :label="o.label" :value="o.value" />
         </el-select>
       </el-form-item>
       <el-form-item label="变动" prop="changeType">
-        <el-select v-model="queryParams.changeType" placeholder="全部" clearable style="width: 120px" @change="handleQuery">
+        <el-select v-model="queryParams.changeType" placeholder="全部" clearable style="width: 100px" @change="handleQuery">
           <el-option v-for="dict in typeOptions" :key="dict.value" :label="dict.label" :value="dict.value" />
         </el-select>
       </el-form-item>
-      <el-form-item label=" ">
+      <el-form-item class="no-label">
         <el-checkbox :model-value="queryParams.includeDeleted === '1'" @change="v => { queryParams.includeDeleted = v ? '1' : '0'; handleQuery() }">
-          显示来源单已删除的流水
+          显示已删除来源
         </el-checkbox>
       </el-form-item>
       <el-form-item>
@@ -50,14 +52,10 @@
       </el-form-item>
     </el-form>
 
-    <el-row :gutter="10" class="mb8">
-      <el-col :span="1.5">
-        <el-button type="primary" plain icon="Plus" @click="handleAdd" v-hasPermi="['beverage:stock:add']">新增流水</el-button>
-      </el-col>
-      <el-col :span="1.5">
-        <el-button type="danger" plain icon="Delete" :disabled="multiple" @click="handleDelete" v-hasPermi="['beverage:stock:remove']">删除</el-button>
-      </el-col>
-      <el-col :span="10">
+    <el-row :gutter="10" class="mb8 toolbar-row">
+      <el-col :span="12">
+        <el-button type="primary" plain icon="Plus" size="small" @click="handleAdd" v-hasPermi="['beverage:stock:add']">新增流水</el-button>
+        <el-button type="danger" plain icon="Delete" size="small" :disabled="multiple" @click="handleDelete" v-hasPermi="['beverage:stock:remove']">删除</el-button>
         <span class="legend">
           <i class="lg lg-in"></i>采购入库
           <i class="lg lg-out"></i>销售出库
@@ -67,21 +65,23 @@
           <i class="lg lg-rev"></i>撤销/冲销
         </span>
       </el-col>
-      <right-toolbar v-model:showSearch="showSearch" @queryTable="getList"></right-toolbar>
+      <el-col :span="12" style="text-align: right">
+        <right-toolbar v-model:showSearch="showSearch" @queryTable="getList"></right-toolbar>
+      </el-col>
     </el-row>
 
-    <el-table v-loading="loading" :data="stockList" @selection-change="handleSelectionChange">
-      <el-table-column type="selection" width="55" align="center" />
-      <el-table-column label="商品名称" align="center" prop="productName" :show-overflow-tooltip="true" min-width="120" />
-      <el-table-column label="规格/单位" align="center" width="120">
+    <el-table v-loading="loading" :data="stockList" size="small" class="compact-table" @selection-change="handleSelectionChange">
+      <el-table-column type="selection" width="42" align="center" />
+      <el-table-column label="商品名称" align="left" prop="productName" :show-overflow-tooltip="true" min-width="130" />
+      <el-table-column label="规格/单位" align="center" width="110">
         <template #default="scope"><span>{{ scope.row.spec }} / {{ scope.row.unit }}</span></template>
       </el-table-column>
-      <el-table-column label="来源" align="center" width="110">
+      <el-table-column label="来源" align="center" width="100">
         <template #default="scope">
           <el-tag :type="sourceInfo(scope.row).tagType" effect="light" size="small">{{ sourceInfo(scope.row).label }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="变动" align="center" width="130">
+      <el-table-column label="变动" align="center" width="110">
         <template #default="scope">
           <span :style="{ color: changeColor(scope.row), fontWeight: isReverseRow(scope.row) ? 400 : 600, textDecoration: isReverseRow(scope.row) ? 'line-through' : 'none' }">
             <template v-if="isReverseRow(scope.row)">
@@ -91,12 +91,12 @@
           </span>
         </template>
       </el-table-column>
-      <el-table-column label="变动后库存" align="center" prop="afterQty" width="100" />
-      <el-table-column label="关联单号" align="center" width="190">
+      <el-table-column label="变动后库存" align="center" prop="afterQty" width="90" />
+      <el-table-column label="关联单号" align="center" width="185">
         <template #default="scope">
           <template v-if="scope.row.refStatus === '1'">
             <span style="color:#c0c4cc;text-decoration:line-through">{{ scope.row.refNo }}</span>
-            <el-tag type="info" effect="plain" size="small" style="margin-left:4px">来源单已删除</el-tag>
+            <el-tag type="info" effect="plain" size="small" style="margin-left:4px">已删除</el-tag>
           </template>
           <el-link v-else-if="scope.row.refNo" type="primary" :underline="false" @click="openRefDetail(scope.row.refNo)">
             {{ scope.row.refNo }} <el-icon><Right /></el-icon>
@@ -104,10 +104,10 @@
           <span v-else style="color:#c0c4cc">— 手动 —</span>
         </template>
       </el-table-column>
-      <el-table-column label="时间" align="center" prop="createTime" width="160">
-        <template #default="scope"><span>{{ parseTime(scope.row.createTime) }}</span></template>
+      <el-table-column label="时间" align="center" prop="createTime" width="150">
+        <template #default="scope"><span>{{ parseTime(scope.row.createTime, '{y}-{m}-{d} {h}:{i}') }}</span></template>
       </el-table-column>
-      <el-table-column label="操作" align="center" width="90" class-name="small-padding fixed-width">
+      <el-table-column label="操作" align="center" width="70" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['beverage:stock:remove']">删除</el-button>
         </template>
@@ -367,7 +367,8 @@ function resetQuery() {
 }
 
 function filterByProduct(name) {
-  queryParams.value.productName = name
+  // 再次点击已选中的商品 = 取消筛选
+  queryParams.value.productName = queryParams.value.productName === name ? undefined : name
   queryParams.value.pageNum = 1
   getList()
 }
@@ -517,12 +518,24 @@ onMounted(() => {
 </script>
 
 <style scoped lang="scss">
+/* ===== 页面整体密度 ===== */
+.stock-page { padding: 12px 14px; }
 .mb8 { margin-bottom: 8px; }
 .form-tip {
   font-size: 12px; line-height: 1.4; color: var(--el-text-color-secondary); margin-top: 2px;
 }
-.legend { font-size: 12px; color: #909399; display: inline-flex; align-items: center; gap: 4px; }
-.legend .lg { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin: 0 2px 0 10px; }
+
+/* ===== 查询区：压缩行距 ===== */
+.query-form {
+  margin-bottom: 6px;
+  :deep(.el-form-item) { margin-bottom: 8px; margin-right: 12px; }
+}
+
+/* ===== 工具栏：按钮 + 图例同行，更紧凑 ===== */
+.toolbar-row { align-items: center; }
+.toolbar-row .el-button + .el-button { margin-left: 8px; }
+.legend { font-size: 12px; color: #909399; display: inline-flex; align-items: center; margin-left: 14px; gap: 2px; }
+.legend .lg { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin: 0 3px 0 10px; }
 .lg-in { background: #67C23A; }
 .lg-out { background: #F56C6C; }
 .lg-pr { background: #E6A23C; }
@@ -530,21 +543,37 @@ onMounted(() => {
 .lg-man { background: #909399; }
 .lg-rev { background: #C0C4CC; }
 
-.overview-card { margin-bottom: 14px; }
-.overview-header { display: flex; justify-content: space-between; align-items: center; font-weight: 600; }
-.overview-header .el-icon { vertical-align: -2px; margin-right: 4px; }
-.overview-sub { font-size: 12px; font-weight: normal; color: #909399; }
-.overview-body { display: flex; flex-wrap: wrap; gap: 10px; max-height: 220px; overflow-y: auto; }
-.empty-tip { color: #c0c4cc; font-size: 13px; padding: 20px; }
-.ov-item {
-  width: 150px; border: 1px solid var(--el-border-color-lighter); border-radius: 8px;
-  padding: 10px 12px; cursor: pointer; transition: all .2s;
+/* ===== 库存概览条带：替代大卡片，紧凑网格 ===== */
+.overview-strip {
+  border: 1px solid var(--el-border-color-lighter); border-radius: 6px;
   background: var(--el-fill-color-blank);
+  padding: 8px 12px; margin-bottom: 10px;
 }
-.ov-item:hover { border-color: var(--el-color-primary); box-shadow: 0 2px 8px rgba(0,0,0,.08); }
-.ov-name { font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ov-spec { font-size: 12px; color: #909399; margin: 2px 0 6px; }
-.ov-qty { font-size: 20px; font-weight: 700; color: var(--el-color-primary); }
-.ov-unit { font-size: 12px; color: #909399; margin-left: 3px; font-weight: normal; }
+.ov-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px; }
+.ov-title { font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; }
+.ov-title .el-icon { vertical-align: -2px; margin-right: 4px; }
+.ov-sub { font-size: 12px; color: #909399; }
+.ov-list {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 6px; max-height: 108px; overflow-y: auto;
+}
+.ov-item {
+  border: 1px solid var(--el-border-color-lighter); border-radius: 5px;
+  padding: 5px 9px; cursor: pointer; transition: all .15s;
+  background: var(--el-bg-color);
+}
+.ov-item:hover, .ov-item.active { border-color: var(--el-color-primary); box-shadow: 0 1px 5px rgba(0,0,0,.07); }
+.ov-top { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+.ov-name { font-weight: 600; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ov-qty { font-size: 15px; font-weight: 700; color: var(--el-color-primary); white-space: nowrap; }
+.ov-qty i { font-style: normal; font-size: 11px; color: #909399; margin-left: 2px; font-weight: normal; }
+.ov-spec { font-size: 11px; color: #909399; margin-top: 1px; }
+.empty-tip { color: #c0c4cc; font-size: 13px; padding: 8px 0; }
+
+/* ===== 表格：压缩行高 ===== */
+.compact-table {
+  :deep(.el-table__cell) { padding: 5px 0; }
+  :deep(.el-table__header th) { font-weight: 600; }
+}
 .doc-desc { margin-bottom: 6px; }
 </style>
