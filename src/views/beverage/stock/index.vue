@@ -82,7 +82,10 @@
             <template v-if="isReverseRow(scope.row)">
               <span style="font-size:11px;color:#909399;margin-right:2px">撤销</span>
             </template>
-            {{ changeSign(scope.row) }}{{ scope.row.changeQty }} {{ scope.row.unit }}
+            <template v-if="changeSign(scope.row) !== '±'">
+              {{ changeSign(scope.row) }}
+            </template>
+            {{ Math.abs(scope.row.changeQty) }} {{ scope.row.unit }}
           </span>
         </template>
       </el-table-column>
