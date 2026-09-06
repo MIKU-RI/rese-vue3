@@ -122,10 +122,10 @@
     </el-row>
 
     <!-- 详情抽屉 -->
-    <el-drawer v-model="detailOpen" title="商品详情" size="420px" append-to-body>
+    <el-drawer v-model="detailOpen" title="商品详情" size="460px" append-to-body>
       <div v-if="current" class="detail">
         <div class="detail__media">
-          <img v-if="current.image" :src="imgUrl(current.image)" class="detail__img" alt="商品图" />
+          <img v-if="current.image" :src="imgUrl(current.image)" class="detail__img" alt="商品图" style="width:100%;height:320px;object-fit:contain;display:block;background:var(--el-fill-color-light);border-radius:8px;" />
           <div v-else class="detail__placeholder" :style="{ background: brandColor(current.brand) }">
             {{ (current.productName || '?').charAt(0) }}
           </div>
@@ -664,19 +664,20 @@ onMounted(() => {
   }
 
   .detail {
-    &__media { text-align: center; margin-bottom: 16px; padding: 8px; }
+    &__media { text-align: center; margin-bottom: 16px; padding: 12px 16px; }
     &__img {
-      display: block;
-      width: 100%;
-      height: 360px;
-      max-width: 100%;
-      max-height: 360px;
-      border-radius: 8px;
-      object-fit: contain;
+      display: block !important;
+      width: 100% !important;
+      height: 320px !important;
+      max-width: 100% !important;
+      max-height: 320px !important;
+      border-radius: 10px;
+      object-fit: contain !important;
       background: var(--el-fill-color-light);
+      margin: 0 auto;
     }
     &__placeholder {
-      width: 100%; height: 360px; border-radius: 8px;
+      width: 100%; height: 320px; border-radius: 10px;
       display: flex; align-items: center; justify-content: center;
       color: #fff; font-size: 64px; font-weight: 700;
     }
