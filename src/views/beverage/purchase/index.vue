@@ -69,7 +69,7 @@
     <pagination v-show="total > 0" :total="total" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" @pagination="getList" />
 
     <!-- 添加/修改进货单对话框 -->
-    <el-dialog :title="title" v-model="open" width="900px" append-to-body>
+    <el-dialog :title="title" v-model="open" width="1100px" append-to-body>
       <el-form :model="form" :rules="rules" ref="purchaseRef" label-width="100px">
         <el-row>
           <el-col :span="12">
@@ -145,7 +145,7 @@
     </el-dialog>
 
     <!-- 明细查看对话框 -->
-    <el-dialog title="进货单明细" v-model="detailOpen" width="800px" append-to-body>
+    <el-dialog title="进货单明细" v-model="detailOpen" width="1000px" append-to-body>
       <el-descriptions :column="3" border size="small" style="margin-bottom:12px">
         <el-descriptions-item label="单号">{{ detail.purchaseNo }}</el-descriptions-item>
         <el-descriptions-item label="供应商">{{ detail.supplierName }}</el-descriptions-item>
@@ -154,12 +154,15 @@
         <el-descriptions-item label="状态">{{ detail.status === '0' ? '待入库' : '已入库' }}</el-descriptions-item>
       </el-descriptions>
       <el-table :data="detail.items" border>
-        <el-table-column label="商品名称" prop="productName" />
-        <el-table-column label="规格" prop="spec" width="110" />
-        <el-table-column label="单位" prop="unit" width="70" />
-        <el-table-column label="数量" prop="qty" width="80" align="center" />
-        <el-table-column label="单价" width="100" align="center"><template #default="s">¥ {{ formatMoney(s.row.price) }}</template></el-table-column>
-        <el-table-column label="金额" width="110" align="center"><template #default="s">¥ {{ formatMoney(s.row.amount) }}</template></el-table-column>
+        <el-table-column label="商品名称" prop="productName" min-width="120" />
+        <el-table-column label="规格" prop="spec" width="90" />
+        <el-table-column label="单位" prop="unit" width="60" />
+        <el-table-column label="批次号" prop="batchNo" width="120" />
+        <el-table-column label="生产日期" prop="productionDate" width="100" align="center" />
+        <el-table-column label="保质期至" prop="expiryDate" width="100" align="center" />
+        <el-table-column label="数量" prop="qty" width="70" align="center" />
+        <el-table-column label="单价" width="90" align="center"><template #default="s">¥ {{ formatMoney(s.row.price) }}</template></el-table-column>
+        <el-table-column label="金额" width="100" align="center"><template #default="s">¥ {{ formatMoney(s.row.amount) }}</template></el-table-column>
       </el-table>
     </el-dialog>
   </div>

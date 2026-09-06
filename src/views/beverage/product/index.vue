@@ -149,6 +149,38 @@
           </el-descriptions-item>
           <el-descriptions-item label="备注">{{ current.remark || '—' }}</el-descriptions-item>
         </el-descriptions>
+
+        <!-- 批次存量视图 -->
+        <div class="detail__batches">
+          <div class="detail__batches-head">
+            <span>批次存量</span>
+            <el-tag v-if="currentBatches.length === 0" size="small" type="info">暂无批次记录</el-tag>
+            <el-tag v-else-if="batchSum < Number(current.stock)" size="small" type="warning">
+              未建档 {{ Number(current.stock) - batchSum }} {{ current.unit }}
+            </el-tag>
+          </div>
+          <el-table :data="currentBatches" size="small" border v-if="currentBatches.length > 0">
+            <el-table-column label="批次号" prop="batchNo" min-width="110" show-overflow-tooltip />
+            <el-table-column label="生产日期" width="100" align="center">
+              <template #default="s">{{ fmtDate(s.row.productionDate) }}</template>
+            </el-table-column>
+            <el-table-column label="保质期至" width="100" align="center">
+              <template #default="s">
+                <span :style="{ color: expiryTagType(s.row) === 'danger' ? '#F56C6C' : (expiryTagType(s.row) === 'warning' ? '#E6A23C' : 'inherit') }">
+                  {{ fmtDate(s.row.expiryDate) }}
+                </span>
+              </template>
+            </el-table-column>
+            <el-table-column label="状态" width="80" align="center">
+              <template #default="s">
+                <el-tag :type="expiryTagType(s.row)" size="small" effect="light">{{ expiryLabel(s.row) }}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="存量" width="75" align="center">
+              <template #default="s">{{ s.row.qty }} {{ current.unit }}</template>
+            </el-table-column>
+          </el-table>
+        </div>
       </div>
       <template #footer>
         <el-button icon="Box" type="success" @click="openStockAdjust(current)" v-hasPermi="['beverage:product:stock']">调整库存</el-button>
@@ -240,35 +272,15 @@
       </template>
     </el-dialog>
 
-    <!-- 调整库存（单品，生成库存台账记录，仅超管） -->
-    <el-dialog title="调整库存" v-model="stockOpen" width="460px" append-to-body @closed="stockTarget = null">
-      <div v-if="stockTarget" class="stock-adjust">
-        <div class="stock-adjust__head">
-          <b>{{ stockTarget.productName }}</b>
-          <span class="stock-adjust__meta">{{ stockTarget.spec }} / {{ stockTarget.unit }}</span>
-        </div>
-        <el-descriptions :column="1" border size="small" style="margin: 12px 0">
-          <el-descriptions-item label="当前库存">{{ stockTarget.stock }} {{ stockTarget.unit }}</el-descriptions-item>
-        </el-descriptions>
-        <el-form label-width="92px">
-          <el-form-item label="调整后库存">
-            <el-input-number v-model="stockTarget.newStock" :min="0" :step="1" :precision="0" :controls-position="'right'" style="width: 100%" />
-            <div class="form-tip">本次变动：{{ stockDelta > 0 ? '+' : '' }}{{ stockDelta }} {{ stockTarget.unit }}；保存后会生成一条「盘点」库存台账记录</div>
-          </el-form-item>
-        </el-form>
-      </div>
-      <template #footer>
-        <div class="dialog-footer">
-          <el-button type="primary" @click="submitStockAdjust">确 定</el-button>
-          <el-button @click="stockOpen = false">取 消</el-button>
-        </div>
-      </template>
-    </el-dialog>
+    <!-- 调整库存（单品·批次化，生成库存台账记录，仅超管） -->
+    <BatchStockDialog ref="batchStockRef" @saved="getList" />
   </div>
 </template>
 
 <script setup name="BeverageProduct">
-import { listProduct, getProduct, delProduct, addProduct, updateProduct, updateProductStock } from "@/api/beverage/product"
+import { listProduct, getProduct, delProduct, addProduct, updateProduct } from "@/api/beverage/product"
+import { listBatch } from "@/api/beverage/batch"
+import BatchStockDialog from "../components/BatchStockDialog.vue"
 import ImageUpload from "@/components/ImageUpload"
 import { useDict } from "@/utils/dict"
 import { isExternal } from "@/utils/validate"
@@ -394,9 +406,43 @@ function getList() {
   })
 }
 
+/* ---------------- 批次视图（商品详情） ---------------- */
+const currentBatches = ref([])
+const batchLoading = ref(false)
+const batchSum = computed(() => currentBatches.value.reduce((s, b) => s + (Number(b.qty) || 0), 0))
+
 function openDetail(row) {
   current.value = row
   detailOpen.value = true
+  loadBatches(row.productId)
+}
+function loadBatches(productId) {
+  currentBatches.value = []
+  batchLoading.value = true
+  listBatch({ productId }).then(res => {
+    currentBatches.value = (res.data || res.rows || []).filter(b => Number(b.qty) > 0 || !b.batchId)
+  }).catch(() => { currentBatches.value = [] })
+    .finally(() => { batchLoading.value = false })
+}
+function fmtDate(v) {
+  if (!v) return '—'
+  return String(v).slice(0, 10)
+}
+function expiryTagType(b) {
+  if (b.expiryStatus === 'expired') return 'danger'
+  if (b.expiryStatus === 'near') return 'warning'
+  if (b.expiryStatus === 'none') return 'info'
+  return 'success'
+}
+function expiryLabel(b) {
+  if (b.expiryStatus === 'expired') return '已过期'
+  if (b.expiryStatus === 'near') return '临期' + (b.remainingDays != null ? `(${b.remainingDays}天)` : '')
+  if (b.expiryStatus === 'none') return '无期限'
+  return '正常'
+}
+function batchSourceFmt(row) {
+  const m = { '1': '采购入库', '2': '手动建档', '3': '退货回补', '4': '冲销回补' }
+  return m[row.sourceType] || '—'
 }
 
 function handleDelete(row) {
@@ -476,41 +522,13 @@ function submitForm() {
   })
 }
 
-/* ---------------- 调整库存（单品，生成台账） ---------------- */
-const stockOpen = ref(false)
-const stockTarget = ref(null)
-const stockDelta = computed(() => {
-  if (!stockTarget.value) return 0
-  return (Number(stockTarget.value.newStock) || 0) - (Number(stockTarget.value.stock) || 0)
-})
+/* ---------------- 调整库存（单品·批次化，生成台账） ---------------- */
+const batchStockRef = ref(null)
 function openStockAdjust(row) {
   const id = row && row.productId ? row.productId : (current.value ? current.value.productId : undefined)
   if (!id) return
   detailOpen.value = false
-  getProduct(id).then(res => {
-    const p = res.data
-    stockTarget.value = { ...p, newStock: Number(p.stock) || 0 }
-    stockOpen.value = true
-  })
-}
-function submitStockAdjust() {
-  if (!stockTarget.value) return
-  const target = Number(stockTarget.value.newStock) || 0
-  if (target < 0) {
-    proxy.$modal.msgError("库存不能为负数")
-    return
-  }
-  const id = stockTarget.value.productId
-  const current = Number(stockTarget.value.stock) || 0
-  if (target === current) {
-    proxy.$modal.msgWarning("库存没有变化")
-    return
-  }
-  updateProductStock([{ productId: id, stock: target }]).then(() => {
-    proxy.$modal.msgSuccess("已调整库存并生成台账记录")
-    stockOpen.value = false
-    getList()
-  }).catch(() => {})
+  batchStockRef.value.open(id)
 }
 
 watch(activeBrand, applyFilter)
@@ -682,6 +700,14 @@ onMounted(() => {
       color: #fff; font-size: 64px; font-weight: 700;
     }
     &__name { text-align: center; margin: 8px 0 16px; }
+    &__batches {
+      margin-top: 16px;
+      &-head {
+        display: flex; align-items: center; gap: 8px;
+        font-size: 13px; font-weight: 600; margin-bottom: 8px;
+        color: var(--el-text-color-primary);
+      }
+    }
   }
 }
 </style>

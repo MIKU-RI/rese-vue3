@@ -76,6 +76,12 @@
           <el-tag :type="sourceInfo(scope.row).tagType" effect="light" size="small">{{ sourceInfo(scope.row).label }}</el-tag>
         </template>
       </el-table-column>
+      <el-table-column label="批次" align="center" width="130">
+        <template #default="scope">
+          <span v-if="scope.row.batchNo" :title="scope.row.batchNo" style="font-size:12px">{{ scope.row.batchNo }}</span>
+          <span v-else style="color:#c0c4cc">—</span>
+        </template>
+      </el-table-column>
       <el-table-column label="变动" align="center" width="110">
         <template #default="scope">
           <span :style="{ color: changeColor(scope.row), fontWeight: isReverseRow(scope.row) ? 400 : 600, textDecoration: isReverseRow(scope.row) ? 'line-through' : 'none' }">
