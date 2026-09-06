@@ -168,7 +168,7 @@
             <el-row>
               <el-col :span="12">
                 <el-form-item label="品牌" prop="brand">
-                  <el-select v-model="form.brand" placeholder="请选择品牌" filterable style="width: 100%">
+                  <el-select v-model="form.brand" placeholder="请选择品牌（字典中维护）" filterable style="width: 100%">
                     <el-option
                       v-for="o in beverage_brand"
                       :key="o.value"
@@ -176,7 +176,6 @@
                       :value="o.value"
                     />
                   </el-select>
-                  <div class="form-tip">品牌在「系统管理 → 字典管理 → 饮料品牌」中维护</div>
                 </el-form-item>
               </el-col>
               <el-col :span="12">
@@ -186,14 +185,14 @@
               </el-col>
             </el-row>
             <el-row>
-              <el-col :span="8">
+              <el-col :span="12">
                 <el-form-item label="单位" prop="unit">
-                  <el-input v-model="form.unit" placeholder="箱/瓶/提" />
+                  <el-input v-model="form.unit" placeholder="如 箱/瓶/提" style="width: 100%" />
                 </el-form-item>
               </el-col>
-              <el-col :span="16">
+              <el-col :span="12">
                 <el-form-item label="条码" prop="barcode">
-                  <el-input v-model="form.barcode" placeholder="选填" />
+                  <el-input v-model="form.barcode" placeholder="选填" style="width: 100%" />
                 </el-form-item>
               </el-col>
             </el-row>
@@ -212,9 +211,8 @@
             <el-row>
               <el-col :span="12">
                 <el-form-item label="预警阈值" prop="warnStock">
-                  <el-input-number v-model="form.warnStock" :min="0" :step="1" :precision="0" :controls-position="'right'" style="width: 100%" />
+                  <el-input-number v-model="form.warnStock" :min="0" :step="1" :precision="0" :controls-position="'right'" style="width: 100%" placeholder="低于此值触发预警" />
                 </el-form-item>
-                <div class="form-tip">库存数量请通过「调整库存」功能修改，系统会自动生成库存台账记录</div>
               </el-col>
             </el-row>
             <el-form-item label="状态">
@@ -666,10 +664,19 @@ onMounted(() => {
   }
 
   .detail {
-    &__media { text-align: center; margin-bottom: 16px; }
-    &__img { max-width: 100%; max-height: 260px; border-radius: 8px; object-fit: contain; background: var(--el-fill-color-light); }
+    &__media { text-align: center; margin-bottom: 16px; padding: 8px; }
+    &__img {
+      display: block;
+      width: 100%;
+      height: 360px;
+      max-width: 100%;
+      max-height: 360px;
+      border-radius: 8px;
+      object-fit: contain;
+      background: var(--el-fill-color-light);
+    }
     &__placeholder {
-      width: 100%; height: 200px; border-radius: 8px;
+      width: 100%; height: 360px; border-radius: 8px;
       display: flex; align-items: center; justify-content: center;
       color: #fff; font-size: 64px; font-weight: 700;
     }
