@@ -82,7 +82,7 @@
             <template v-if="isReverseRow(scope.row)">
               <span style="font-size:11px;color:#909399;margin-right:2px">撤销</span>
             </template>
-            {{ scope.row.changeType === '0' ? '+' : scope.row.changeType === '1' ? '−' : '±' }}{{ scope.row.changeQty }} {{ scope.row.unit }}
+            {{ changeSign(scope.row) }}{{ scope.row.changeQty }} {{ scope.row.unit }}
           </span>
         </template>
       </el-table-column>
@@ -321,9 +321,19 @@ function sourceInfo(row) {
 
 function changeColor(row) {
   if (isReverseRow(row)) return '#909399'    // 撤销/冲销 灰
-  if (row.changeType === '0') return '#67C23A'   // 入库 绿
-  if (row.changeType === '1') return '#F56C6C'   // 出库 红
-  return '#909399'                          // 盘点 灰
+  // 按变动数量正负区分方向：增=绿、减=红（覆盖入库/出库/手动盘点全部类型）
+  const q = Number(row.changeQty)
+  if (q > 0) return '#67C23A'
+  if (q < 0) return '#F56C6C'
+  return '#909399'
+}
+
+// 变动符号：正数 +、负数 −、零 ±（不再依赖 changeType，手动盘点也能看出增减）
+function changeSign(row) {
+  const q = Number(row.changeQty)
+  if (q > 0) return '+'
+  if (q < 0) return '−'
+  return '±'
 }
 
 // ===== 库存概览 =====
