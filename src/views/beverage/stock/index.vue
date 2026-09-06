@@ -322,20 +322,31 @@ function sourceInfo(row) {
   return { type, label: deleted ? '已失效' : label, tagType: deleted || reverse ? 'info' : meta.tagType, reverse, deleted }
 }
 
+// 库存方向：direction = 1 增 / -1 减 / 0 持平。
+// 业务单据 change_qty 存的是「绝对值」，增减方向由 change_type 决定：
+//   type=0 入库/销售退货(回补) → 增；type=1 出库/采购退货(冲减) → 减；type=2 盘点 → 按 change_qty 符号。
+function stockDirection(row) {
+  const t = String(row.changeType)
+  const q = Number(row.changeQty)
+  if (t === '0') return q === 0 ? 0 : 1
+  if (t === '1') return q === 0 ? 0 : -1
+  if (t === '2') return q > 0 ? 1 : (q < 0 ? -1 : 0)
+  return q > 0 ? 1 : (q < 0 ? -1 : 0)
+}
+
 function changeColor(row) {
   if (isReverseRow(row)) return '#909399'    // 撤销/冲销 灰
-  // 按变动数量正负区分方向：增=绿、减=红（覆盖入库/出库/手动盘点全部类型）
-  const q = Number(row.changeQty)
-  if (q > 0) return '#67C23A'
-  if (q < 0) return '#F56C6C'
+  const dir = stockDirection(row)
+  if (dir > 0) return '#67C23A'
+  if (dir < 0) return '#F56C6C'
   return '#909399'
 }
 
-// 变动符号：正数 +、负数 −、零 ±（不再依赖 changeType，手动盘点也能看出增减）
+// 变动符号：按 change_type 定方向（+ 增 / − 减 / ± 持平）
 function changeSign(row) {
-  const q = Number(row.changeQty)
-  if (q > 0) return '+'
-  if (q < 0) return '−'
+  const dir = stockDirection(row)
+  if (dir > 0) return '+'
+  if (dir < 0) return '−'
   return '±'
 }
 
