@@ -42,10 +42,10 @@
         <el-button type="primary" plain icon="Plus" @click="handleAdd" v-hasPermi="['beverage:return:add']">新增退货单</el-button>
       </el-col>
       <el-col :span="1.5">
-        <el-button type="success" plain icon="Edit" :disabled="single" @click="handleUpdate" v-hasPermi="['beverage:return:edit']">修改</el-button>
+        <el-button type="success" plain icon="Edit" :disabled="single || editLocked" :title="editLocked ? '已退货的退货单不可修改，请先执行「撤销退货」' : ''" @click="handleUpdate" v-hasPermi="['beverage:return:edit']">修改</el-button>
       </el-col>
       <el-col :span="1.5">
-        <el-button type="danger" plain icon="Delete" :disabled="multiple" @click="handleDelete" v-hasPermi="['beverage:return:remove']">删除</el-button>
+        <el-button type="danger" plain icon="Delete" :disabled="multiple || deleteLocked" :title="deleteLocked ? '已退货的退货单不可删除，请先执行「撤销退货」' : ''" @click="handleDelete" v-hasPermi="['beverage:return:remove']">删除</el-button>
       </el-col>
       <right-toolbar v-model:showSearch="showSearch" @queryTable="getList"></right-toolbar>
     </el-row>
@@ -83,8 +83,8 @@
           <el-button link type="primary" icon="View" @click="handleDetail(scope.row)">明细</el-button>
           <el-button v-if="scope.row.status === '0'" link type="success" icon="Top" @click="handleApply(scope.row)" v-hasPermi="['beverage:return:edit']">退货</el-button>
           <el-button v-if="scope.row.status === '1'" link type="warning" icon="Bottom" @click="handleReverse(scope.row)" v-hasPermi="['beverage:return:edit']">撤销退货</el-button>
-          <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['beverage:return:edit']">修改</el-button>
-          <el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['beverage:return:remove']">删除</el-button>
+          <el-button v-if="scope.row.status === '0'" link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['beverage:return:edit']">修改</el-button>
+          <el-button v-if="scope.row.status === '0'" link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['beverage:return:remove']">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -510,12 +510,27 @@ function resetQuery() {
 }
 
 function handleSelectionChange(selection) {
+  selectedRows.value = selection
   ids.value = selection.map(item => item.returnId)
   single.value = selection.length != 1
   multiple.value = !selection.length
 }
 
+// 已退货（库存已联动）的退货单不可修改/删除：需先执行「撤销退货」回到待退货态
+const lockedRow = (row) => !!row && row.status === '1'
+const selectedRows = ref([])
+const editLocked = computed(() => selectedRows.value.length === 1 && lockedRow(selectedRows.value[0]))
+const deleteLocked = computed(() => selectedRows.value.some(lockedRow))
+
 function handleDelete(row) {
+  if (row && lockedRow(row)) {
+    proxy.$modal.msgWarning('已退货的退货单不可删除，请先执行「撤销退货」')
+    return
+  }
+  if (!row && selectedRows.value.some(lockedRow)) {
+    proxy.$modal.msgWarning('所选退货单中包含已退货的单据，请先执行「撤销退货」')
+    return
+  }
   const returnIds = row.returnId || ids.value
   proxy.$modal.confirm('是否确认删除退货单编号为"' + returnIds + '"的数据项？').then(function () {
     return delReturn(returnIds)
@@ -558,6 +573,11 @@ function handleAdd() {
 }
 
 function handleUpdate(row) {
+  const target = row || (selectedRows.value.length === 1 ? selectedRows.value[0] : null)
+  if (target && lockedRow(target)) {
+    proxy.$modal.msgWarning('已退货的退货单不可修改，请先执行「撤销退货」')
+    return
+  }
   reset()
   const returnId = row.returnId || ids.value
   getReturn(returnId).then(res => {
