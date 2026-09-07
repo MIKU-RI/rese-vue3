@@ -22,22 +22,22 @@
 
     <el-form :model="queryParams" ref="queryRef" :inline="true" v-show="showSearch" label-width="60px" class="query-form">
       <el-form-item label="商品" prop="productName">
-        <el-select v-model="queryParams.productName" placeholder="全部商品" clearable filterable style="width: 170px" @change="handleQuery">
+        <el-select v-model="queryParams.productName" placeholder="全部商品" clearable filterable style="width: 200px" @change="handleQuery">
           <el-option v-for="p in productOptions" :key="p.productId" :label="p.productName" :value="p.productName" />
         </el-select>
       </el-form-item>
       <el-form-item label="品牌" prop="brand">
-        <el-select v-model="queryParams.brand" placeholder="全部品牌" clearable filterable style="width: 140px" @change="handleQuery">
+        <el-select v-model="queryParams.brand" placeholder="全部品牌" clearable filterable style="width: 160px" @change="handleQuery">
           <el-option v-for="o in beverage_brand" :key="o.value" :label="o.label" :value="o.value" />
         </el-select>
       </el-form-item>
       <el-form-item label="来源" prop="refType">
-        <el-select v-model="queryParams.refType" placeholder="全部来源" clearable style="width: 130px" @change="handleQuery">
+        <el-select v-model="queryParams.refType" placeholder="全部来源" clearable style="width: 150px" @change="handleQuery">
           <el-option v-for="o in sourceOptions" :key="o.value" :label="o.label" :value="o.value" />
         </el-select>
       </el-form-item>
       <el-form-item label="变动" prop="changeType">
-        <el-select v-model="queryParams.changeType" placeholder="全部" clearable style="width: 100px" @change="handleQuery">
+        <el-select v-model="queryParams.changeType" placeholder="全部" clearable style="width: 130px" @change="handleQuery">
           <el-option v-for="dict in typeOptions" :key="dict.value" :label="dict.label" :value="dict.value" />
         </el-select>
       </el-form-item>
@@ -121,8 +121,8 @@
     <pagination v-show="total > 0" :total="total" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" @pagination="getList" />
 
     <!-- 新增/编辑流水 -->
-    <el-dialog :title="title" v-model="open" width="700px" append-to-body>
-      <el-form :model="form" :rules="rules" ref="stockRef" label-width="100px">
+    <el-dialog :title="title" v-model="open" width="780px" append-to-body>
+      <el-form :model="form" :rules="rules" ref="stockRef" label-width="92px">
         <el-row>
           <el-col :span="12">
             <el-form-item label="商品名称" prop="productName">

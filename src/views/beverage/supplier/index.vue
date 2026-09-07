@@ -2,18 +2,18 @@
   <div class="app-container">
     <el-form :model="queryParams" ref="queryRef" :inline="true" v-show="showSearch" label-width="68px">
       <el-form-item label="供应商" prop="supplierName">
-        <el-input v-model="queryParams.supplierName" placeholder="请输入供应商名称" clearable style="width: 200px" @keyup.enter="handleQuery" />
+        <el-input v-model="queryParams.supplierName" placeholder="请输入供应商名称" clearable style="width: 220px" @keyup.enter="handleQuery" />
       </el-form-item>
       <el-form-item label="联系人" prop="contact">
-        <el-input v-model="queryParams.contact" placeholder="请输入联系人" clearable style="width: 160px" @keyup.enter="handleQuery" />
+        <el-input v-model="queryParams.contact" placeholder="请输入联系人" clearable style="width: 180px" @keyup.enter="handleQuery" />
       </el-form-item>
       <el-form-item label="结算方式" prop="settleType">
-        <el-select v-model="queryParams.settleType" placeholder="全部结算方式" clearable style="width: 140px" @change="handleQuery">
+        <el-select v-model="queryParams.settleType" placeholder="全部结算方式" clearable style="width: 160px" @change="handleQuery">
           <el-option v-for="dict in settleTypeOptions" :key="dict.value" :label="dict.label" :value="dict.value" />
         </el-select>
       </el-form-item>
       <el-form-item label="状态" prop="status">
-        <el-select v-model="queryParams.status" placeholder="状态" clearable style="width: 140px">
+        <el-select v-model="queryParams.status" placeholder="状态" clearable style="width: 150px">
           <el-option v-for="dict in statusOptions" :key="dict.value" :label="dict.label" :value="dict.value" />
         </el-select>
       </el-form-item>

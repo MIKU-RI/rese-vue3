@@ -2,15 +2,15 @@
   <div class="app-container">
     <el-form :model="queryParams" ref="queryRef" :inline="true" v-show="showSearch" label-width="68px">
       <el-form-item label="出库单号" prop="saleNo">
-        <el-input v-model="queryParams.saleNo" placeholder="请输入单号" clearable style="width: 180px" @keyup.enter="handleQuery" />
+        <el-input v-model="queryParams.saleNo" placeholder="请输入单号" clearable style="width: 220px" @keyup.enter="handleQuery" />
       </el-form-item>
       <el-form-item label="客户" prop="customerName">
-        <el-select v-model="queryParams.customerName" placeholder="全部客户" clearable filterable style="width: 180px" @change="handleQuery">
+        <el-select v-model="queryParams.customerName" placeholder="全部客户" clearable filterable style="width: 220px" @change="handleQuery">
           <el-option v-for="c in customerOptions" :key="c.customerId" :label="c.customerName" :value="c.customerName" />
         </el-select>
       </el-form-item>
       <el-form-item label="状态" prop="status">
-        <el-select v-model="queryParams.status" placeholder="状态" clearable style="width: 120px">
+        <el-select v-model="queryParams.status" placeholder="状态" clearable style="width: 140px">
           <el-option v-for="dict in statusOptions" :key="dict.value" :label="dict.label" :value="dict.value" />
         </el-select>
       </el-form-item>

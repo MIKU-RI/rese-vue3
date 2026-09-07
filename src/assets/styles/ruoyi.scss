@@ -75,6 +75,39 @@
   margin-top: 6vh !important;
 }
 
+/* 弹窗/抽屉尺寸自适应：固定宽度在小屏不溢出屏外，内容超高时弹窗内部滚动 */
+.el-dialog {
+  max-width: 96vw;
+}
+.el-drawer {
+  max-width: 96vw !important;
+}
+.el-dialog__body {
+  max-height: calc(100vh - 200px);
+  overflow-y: auto;
+}
+/* 弹窗内表单控件默认撑满所在栏位，避免输入框比常见文本还短（如备注/地址/名称） */
+.el-dialog .el-form-item {
+  .el-input,
+  .el-select,
+  .el-input-number,
+  .el-autocomplete,
+  .el-cascader,
+  .el-textarea,
+  .el-date-editor {
+    width: 100%;
+  }
+}
+@media screen and (max-width: 768px) {
+  .el-dialog {
+    width: 96% !important;
+    margin-top: 4vh !important;
+  }
+  .el-dialog__body {
+    max-height: calc(100vh - 160px);
+  }
+}
+
 .el-dialog.scrollbar .el-dialog__body {
   overflow: auto;
   overflow-x: hidden;

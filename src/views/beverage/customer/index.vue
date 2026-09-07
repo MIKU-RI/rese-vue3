@@ -379,7 +379,7 @@ onMounted(() => {
     gap: 12px;
     margin-bottom: 16px;
     .cb-search { width: 320px; }
-    .cb-status { width: 130px; }
+    .cb-status { width: 150px; }
   }
 
   .cb-body { align-items: stretch; }

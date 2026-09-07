@@ -59,7 +59,7 @@
             >
               <template #prefix><el-icon><Search /></el-icon></template>
             </el-input>
-            <el-select v-model="statusFilter" placeholder="状态" clearable style="width: 130px" @change="applyFilter">
+            <el-select v-model="statusFilter" placeholder="状态" clearable style="width: 150px" @change="applyFilter">
               <el-option label="在售" value="0" />
               <el-option label="已下架" value="1" />
             </el-select>
@@ -190,10 +190,10 @@
     </el-drawer>
 
     <!-- 新增 / 修改 对话框 -->
-    <el-dialog :title="title" v-model="open" width="720px" append-to-body @closed="onDialogClosed">
+    <el-dialog :title="title" v-model="open" width="880px" append-to-body @closed="onDialogClosed">
       <el-form :model="form" :rules="rules" ref="productRef" label-width="100px">
         <el-row>
-          <el-col :span="14">
+          <el-col :span="16">
             <el-form-item label="商品名称" prop="productName">
               <el-input v-model="form.productName" placeholder="请输入商品名称" />
             </el-form-item>
@@ -246,18 +246,20 @@
                   <el-input-number v-model="form.warnStock" :min="0" :step="1" :precision="0" :controls-position="'right'" style="width: 100%" placeholder="低于此值触发预警" />
                 </el-form-item>
               </el-col>
+              <el-col :span="12">
+                <el-form-item label="状态">
+                  <el-radio-group v-model="form.status">
+                    <el-radio value="0">在售</el-radio>
+                    <el-radio value="1">下架</el-radio>
+                  </el-radio-group>
+                </el-form-item>
+              </el-col>
             </el-row>
-            <el-form-item label="状态">
-              <el-radio-group v-model="form.status">
-                <el-radio value="0">在售</el-radio>
-                <el-radio value="1">下架</el-radio>
-              </el-radio-group>
-            </el-form-item>
             <el-form-item label="备注">
               <el-input v-model="form.remark" type="textarea" :rows="2" placeholder="请输入内容" />
             </el-form-item>
           </el-col>
-          <el-col :span="10">
+          <el-col :span="8">
             <el-form-item label="商品图片" prop="image" label-width="100px">
               <image-upload v-model="form.image" :limit="1" :file-size="5" :drag="false" />
             </el-form-item>

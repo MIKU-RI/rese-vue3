@@ -2,18 +2,18 @@
   <div class="app-container">
     <el-form :model="queryParams" ref="queryRef" :inline="true" v-show="showSearch" label-width="76px">
       <el-form-item label="退货单号" prop="returnNo">
-        <el-input v-model="queryParams.returnNo" placeholder="请输入单号" clearable style="width: 180px" @keyup.enter="handleQuery" />
+        <el-input v-model="queryParams.returnNo" placeholder="请输入单号" clearable style="width: 220px" @keyup.enter="handleQuery" />
       </el-form-item>
       <el-form-item label="来源单号" prop="sourceNo">
-        <el-input v-model="queryParams.sourceNo" placeholder="原进货/销售单号" clearable style="width: 170px" @keyup.enter="handleQuery" />
+        <el-input v-model="queryParams.sourceNo" placeholder="原进货/销售单号" clearable style="width: 200px" @keyup.enter="handleQuery" />
       </el-form-item>
       <el-form-item label="退货类型" prop="returnType">
-        <el-select v-model="queryParams.returnType" placeholder="退货类型" clearable style="width: 140px">
+        <el-select v-model="queryParams.returnType" placeholder="退货类型" clearable style="width: 150px">
           <el-option v-for="dict in returnTypeOptions" :key="dict.value" :label="dict.label" :value="dict.value" />
         </el-select>
       </el-form-item>
       <el-form-item label="往来单位" prop="partnerName">
-        <el-select v-model="queryParams.partnerName" placeholder="全部往来单位" clearable filterable style="width: 200px" @change="handleQuery">
+        <el-select v-model="queryParams.partnerName" placeholder="全部往来单位" clearable filterable style="width: 220px" @change="handleQuery">
           <template v-if="queryParams.returnType !== '2'">
             <el-option-group label="供应商">
               <el-option v-for="s in supplierOptions" :key="'s' + s.supplierId" :label="s.supplierName" :value="s.supplierName" />
@@ -27,7 +27,7 @@
         </el-select>
       </el-form-item>
       <el-form-item label="状态" prop="status">
-        <el-select v-model="queryParams.status" placeholder="状态" clearable style="width: 120px">
+        <el-select v-model="queryParams.status" placeholder="状态" clearable style="width: 140px">
           <el-option v-for="dict in statusOptions" :key="dict.value" :label="dict.label" :value="dict.value" />
         </el-select>
       </el-form-item>

@@ -181,7 +181,7 @@
           </el-radio-group>
         </el-form-item>
         <el-form-item :label="valueLabel">
-          <el-input-number v-model="batch.value" :precision="2" :step="1" style="width: 200px" />
+          <el-input-number v-model="batch.value" :precision="2" :step="1" style="width: 240px" />
           <span class="bp-unit">{{ valueUnit }}</span>
           <div class="bp-hint">{{ valueHint }}</div>
         </el-form-item>
