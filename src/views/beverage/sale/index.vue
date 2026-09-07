@@ -25,10 +25,10 @@
         <el-button type="primary" plain icon="Plus" @click="handleAdd" v-hasPermi="['beverage:sale:add']">新增出库单</el-button>
       </el-col>
       <el-col :span="1.5">
-        <el-button type="success" plain icon="Edit" :disabled="single" @click="handleUpdate" v-hasPermi="['beverage:sale:edit']">修改</el-button>
+        <el-button type="success" plain icon="Edit" :disabled="single || editLocked" :title="editLocked ? '已出库或已产生退货的销售单不可修改，请先撤销出库' : ''" @click="handleUpdate" v-hasPermi="['beverage:sale:edit']">修改</el-button>
       </el-col>
       <el-col :span="1.5">
-        <el-button type="danger" plain icon="Delete" :disabled="multiple" @click="handleDelete" v-hasPermi="['beverage:sale:remove']">删除</el-button>
+        <el-button type="danger" plain icon="Delete" :disabled="multiple || deleteLocked" :title="deleteLocked ? '已出库或已产生退货的销售单不可删除，请先撤销出库' : ''" @click="handleDelete" v-hasPermi="['beverage:sale:remove']">删除</el-button>
       </el-col>
       <right-toolbar v-model:showSearch="showSearch" @queryTable="getList"></right-toolbar>
     </el-row>
@@ -60,8 +60,8 @@
           <el-button v-if="scope.row.status === '0'" link type="success" icon="Bottom" @click="handleOutbound(scope.row)" v-hasPermi="['beverage:sale:edit']">出库</el-button>
           <el-button v-if="scope.row.status === '1'" link type="danger" icon="RefreshLeft" @click="goReturn(scope.row)" :disabled="returning || allReturned(scope.row)" :title="allReturned(scope.row) ? '该单已全部退货，无剩余可退数量' : ''" v-hasPermi="['beverage:return:add']">退货</el-button>
           <el-button v-if="scope.row.status === '1' && isAdmin" link type="warning" icon="Top" @click="handleReverseOutbound(scope.row)" :disabled="hasReturn(scope.row)" :title="hasReturn(scope.row) ? '该单已产生退货记录，不可撤销出库；如需调整请通过「销售退货单」处理' : ''" v-hasPermi="['beverage:sale:edit']">撤销出库</el-button>
-          <el-button v-if="(scope.row.status === '0' || isAdmin) && !hasReturn(scope.row)" link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['beverage:sale:edit']">修改</el-button>
-          <el-button v-if="(scope.row.status === '0' || isAdmin) && !hasReturn(scope.row)" link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['beverage:sale:remove']">删除</el-button>
+          <el-button v-if="scope.row.status === '0' && !hasReturn(scope.row)" link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['beverage:sale:edit']">修改</el-button>
+          <el-button v-if="scope.row.status === '0' && !hasReturn(scope.row)" link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['beverage:sale:remove']">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -166,6 +166,9 @@
         <el-table-column label="实收" width="100" align="center"><template #default="s">¥ {{ formatMoney(s.row.amount) }}</template></el-table-column>
       </el-table>
     </el-dialog>
+
+    <!-- 退货预览确认：先预览原单可退商品并调整数量，确认后再生成退货单（不再一键直接生成） -->
+    <ReturnPreviewDialog v-model="returnOpen" source-type="2" :source-id="returnRow.saleId" :source-no="returnRow.saleNo" @success="getList" />
   </div>
 </template>
 
@@ -173,7 +176,7 @@
 import { listSale, getSale, delSale, addSale, updateSale } from "@/api/beverage/sale"
 import { listCustomer } from "@/api/beverage/customer"
 import { listProduct } from "@/api/beverage/product"
-import { autoCreateReturn } from "@/api/beverage/return"
+import ReturnPreviewDialog from "@/views/beverage/components/ReturnPreviewDialog.vue"
 import { parseTime } from "@/utils/ruoyi"
 import useUserStore from '@/store/modules/user'
 
@@ -189,6 +192,12 @@ const isAdmin = computed(() => {
 // returnStatus: 0未退货 1退货中 2部分退货 3已退货(全部退完)
 const hasReturn = (row) => !!row.returnStatus && row.returnStatus !== '0'
 const allReturned = (row) => row.returnStatus === '3'
+
+// 已出库（或已产生退货）的单据不可修改/删除：需先由超管「撤销出库」回到待出库态
+const lockedRow = (row) => !!row && (row.status === '1' || hasReturn(row))
+const selectedRows = ref([])
+const editLocked = computed(() => selectedRows.value.length === 1 && lockedRow(selectedRows.value[0]))
+const deleteLocked = computed(() => selectedRows.value.some(lockedRow))
 
 // 关联下拉数据
 const customerOptions = ref([])
@@ -300,12 +309,22 @@ function resetQuery() {
 }
 
 function handleSelectionChange(selection) {
+  selectedRows.value = selection
   ids.value = selection.map(item => item.saleId)
   single.value = selection.length != 1
   multiple.value = !selection.length
 }
 
 function handleDelete(row) {
+  // 已出库/已退货单据禁止删除（后端同样硬拦截），需先撤销出库
+  if (row && lockedRow(row)) {
+    proxy.$modal.msgWarning('已出库的销售单不可删除，请先撤销出库')
+    return
+  }
+  if (!row && selectedRows.value.some(lockedRow)) {
+    proxy.$modal.msgWarning('所选单据中包含已出库或已退货的销售单，请先撤销出库')
+    return
+  }
   const saleIds = row.saleId || ids.value
   proxy.$modal.confirm('是否确认删除出库单编号为"' + saleIds + '"的数据项？').then(function () {
     return delSale(saleIds)
@@ -340,6 +359,12 @@ function handleAdd() {
 }
 
 function handleUpdate(row) {
+  // 已出库/已退货单据禁止修改（后端同样硬拦截），需先撤销出库
+  const target = row || (selectedRows.value.length === 1 ? selectedRows.value[0] : null)
+  if (target && lockedRow(target)) {
+    proxy.$modal.msgWarning('已出库的销售单不可修改，请先撤销出库')
+    return
+  }
   reset()
   const saleId = row.saleId || ids.value
   getSale(saleId).then(res => {
@@ -378,17 +403,15 @@ function handleReverseOutbound(row) {
   }).catch(() => {})
 }
 
-// 一键退货：自动按原销售单生成「销售退货单」并联动库存，无需手动填写表单
+// 退货：先弹出预览（可勾选商品、调整数量/折扣/备注），用户确认后才生成退货单
 const returning = ref(false)
+const returnOpen = ref(false)
+const returnRow = reactive({ saleId: undefined, saleNo: '' })
 function goReturn(row) {
   if (returning.value) return
-  proxy.$modal.confirm('确认对销售单「' + row.saleNo + '」执行退货？将自动生成销售退货单并回补库存（退回全部商品）。').then(() => {
-    returning.value = true
-    autoCreateReturn({ returnType: '2', sourceId: row.saleId }).then(() => {
-      proxy.$modal.msgSuccess('退货单已自动创建并执行')
-      getList()
-    }).catch(() => {}).finally(() => { returning.value = false })
-  }).catch(() => {})
+  returnRow.saleId = row.saleId
+  returnRow.saleNo = row.saleNo
+  returnOpen.value = true
 }
 
 function submitForm() {

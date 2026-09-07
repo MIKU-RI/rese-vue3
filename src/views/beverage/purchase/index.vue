@@ -25,10 +25,10 @@
         <el-button type="primary" plain icon="Plus" @click="handleAdd" v-hasPermi="['beverage:purchase:add']">新增进货单</el-button>
       </el-col>
       <el-col :span="1.5">
-        <el-button type="success" plain icon="Edit" :disabled="single" @click="handleUpdate" v-hasPermi="['beverage:purchase:edit']">修改</el-button>
+        <el-button type="success" plain icon="Edit" :disabled="single || editLocked" :title="editLocked ? '已入库或已产生退货的进货单不可修改，请先撤销入库' : ''" @click="handleUpdate" v-hasPermi="['beverage:purchase:edit']">修改</el-button>
       </el-col>
       <el-col :span="1.5">
-        <el-button type="danger" plain icon="Delete" :disabled="multiple" @click="handleDelete" v-hasPermi="['beverage:purchase:remove']">删除</el-button>
+        <el-button type="danger" plain icon="Delete" :disabled="multiple || deleteLocked" :title="deleteLocked ? '已入库或已产生退货的进货单不可删除，请先撤销入库' : ''" @click="handleDelete" v-hasPermi="['beverage:purchase:remove']">删除</el-button>
       </el-col>
       <right-toolbar v-model:showSearch="showSearch" @queryTable="getList"></right-toolbar>
     </el-row>
@@ -60,8 +60,8 @@
           <el-button v-if="scope.row.status === '0'" link type="success" icon="Bottom" @click="handleInbound(scope.row)" v-hasPermi="['beverage:purchase:edit']">入库</el-button>
           <el-button v-if="scope.row.status === '1'" link type="danger" icon="RefreshLeft" @click="goReturn(scope.row)" :disabled="returning || allReturned(scope.row)" :title="allReturned(scope.row) ? '该单已全部退货，无剩余可退数量' : ''" v-hasPermi="['beverage:return:add']">退货</el-button>
           <el-button v-if="scope.row.status === '1' && isAdmin" link type="warning" icon="Top" @click="handleReverseInbound(scope.row)" :disabled="hasReturn(scope.row)" :title="hasReturn(scope.row) ? '该单已产生退货记录，不可撤销入库；如需调整请通过「采购退货单」处理' : ''" v-hasPermi="['beverage:purchase:edit']">撤销入库</el-button>
-          <el-button v-if="(scope.row.status === '0' || isAdmin) && !hasReturn(scope.row)" link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['beverage:purchase:edit']">修改</el-button>
-          <el-button v-if="(scope.row.status === '0' || isAdmin) && !hasReturn(scope.row)" link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['beverage:purchase:remove']">删除</el-button>
+          <el-button v-if="scope.row.status === '0' && !hasReturn(scope.row)" link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['beverage:purchase:edit']">修改</el-button>
+          <el-button v-if="scope.row.status === '0' && !hasReturn(scope.row)" link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['beverage:purchase:remove']">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -190,6 +190,9 @@
         <el-table-column label="金额" width="100" align="center"><template #default="s">¥ {{ formatMoney(s.row.amount) }}</template></el-table-column>
       </el-table>
     </el-dialog>
+
+    <!-- 退货预览确认：先预览原单可退商品并调整数量，确认后再生成退货单（不再一键直接生成） -->
+    <ReturnPreviewDialog v-model="returnOpen" source-type="1" :source-id="returnRow.purchaseId" :source-no="returnRow.purchaseNo" @success="getList" />
   </div>
 </template>
 
@@ -198,7 +201,7 @@ import { listPurchase, getPurchase, delPurchase, addPurchase, updatePurchase } f
 import { listSupplier } from "@/api/beverage/supplier"
 import { listProduct } from "@/api/beverage/product"
 import { listBatch } from "@/api/beverage/batch"
-import { autoCreateReturn } from "@/api/beverage/return"
+import ReturnPreviewDialog from "@/views/beverage/components/ReturnPreviewDialog.vue"
 import { parseTime } from "@/utils/ruoyi"
 import useUserStore from '@/store/modules/user'
 
@@ -214,6 +217,12 @@ const isAdmin = computed(() => {
 // returnStatus: 0未退货 1退货中 2部分退货 3已退货(全部退完)
 const hasReturn = (row) => !!row.returnStatus && row.returnStatus !== '0'
 const allReturned = (row) => row.returnStatus === '3'
+
+// 已入库（或已产生退货）的单据不可修改/删除：需先由超管「撤销入库」回到待入库态
+const lockedRow = (row) => !!row && (row.status === '1' || hasReturn(row))
+const selectedRows = ref([])
+const editLocked = computed(() => selectedRows.value.length === 1 && lockedRow(selectedRows.value[0]))
+const deleteLocked = computed(() => selectedRows.value.some(lockedRow))
 
 // 关联下拉数据
 const supplierOptions = ref([])
@@ -363,12 +372,22 @@ function resetQuery() {
 }
 
 function handleSelectionChange(selection) {
+  selectedRows.value = selection
   ids.value = selection.map(item => item.purchaseId)
   single.value = selection.length != 1
   multiple.value = !selection.length
 }
 
 function handleDelete(row) {
+  // 已入库/已退货单据禁止删除（后端同样硬拦截），需先撤销入库
+  if (row && lockedRow(row)) {
+    proxy.$modal.msgWarning('已入库的进货单不可删除，请先撤销入库')
+    return
+  }
+  if (!row && selectedRows.value.some(lockedRow)) {
+    proxy.$modal.msgWarning('所选单据中包含已入库或已退货的进货单，请先撤销入库')
+    return
+  }
   const purchaseIds = row.purchaseId || ids.value
   proxy.$modal.confirm('是否确认删除采购单编号为"' + purchaseIds + '"的数据项？').then(function () {
     return delPurchase(purchaseIds)
@@ -403,6 +422,12 @@ function handleAdd() {
 }
 
 function handleUpdate(row) {
+  // 已入库/已退货单据禁止修改（后端同样硬拦截），需先撤销入库
+  const target = row || (selectedRows.value.length === 1 ? selectedRows.value[0] : null)
+  if (target && lockedRow(target)) {
+    proxy.$modal.msgWarning('已入库的进货单不可修改，请先撤销入库')
+    return
+  }
   reset()
   const purchaseId = row.purchaseId || ids.value
   getPurchase(purchaseId).then(res => {
@@ -443,17 +468,15 @@ function handleReverseInbound(row) {
   }).catch(() => {})
 }
 
-// 一键退货：自动按原采购单生成「采购退货单」并联动库存，无需手动填写表单
+// 退货：先弹出预览（可勾选商品、调整数量/折扣/备注），用户确认后才生成退货单
 const returning = ref(false)
+const returnOpen = ref(false)
+const returnRow = reactive({ purchaseId: undefined, purchaseNo: '' })
 function goReturn(row) {
   if (returning.value) return
-  proxy.$modal.confirm('确认对采购单「' + row.purchaseNo + '」执行退货？将自动生成采购退货单并扣减库存（退回全部商品）。').then(() => {
-    returning.value = true
-    autoCreateReturn({ returnType: '1', sourceId: row.purchaseId }).then(() => {
-      proxy.$modal.msgSuccess('退货单已自动创建并执行')
-      getList()
-    }).catch(() => {}).finally(() => { returning.value = false })
-  }).catch(() => {})
+  returnRow.purchaseId = row.purchaseId
+  returnRow.purchaseNo = row.purchaseNo
+  returnOpen.value = true
 }
 
 function submitForm() {
