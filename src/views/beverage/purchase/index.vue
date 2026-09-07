@@ -69,7 +69,7 @@
     <pagination v-show="total > 0" :total="total" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" @pagination="getList" />
 
     <!-- 添加/修改进货单对话框 -->
-    <el-dialog :title="title" v-model="open" width="1100px" append-to-body>
+    <el-dialog :title="title" v-model="open" width="1280px" append-to-body>
       <el-form :model="form" :rules="rules" ref="purchaseRef" label-width="100px">
         <el-row>
           <el-col :span="12">
@@ -105,20 +105,45 @@
         <el-divider content-position="left">进货明细</el-divider>
         <el-button type="primary" plain icon="Plus" size="small" @click="addItem" style="margin-bottom:8px">添加明细</el-button>
         <el-table :data="form.items" border>
-          <el-table-column label="商品" min-width="180">
+          <el-table-column label="商品" min-width="160">
             <template #default="scope">
               <el-select v-model="scope.row.productId" placeholder="选择商品" filterable style="width:100%" @change="(val) => onProductChange(scope.row, val)">
                 <el-option v-for="p in productOptions" :key="p.productId" :label="p.productName" :value="p.productId" />
               </el-select>
             </template>
           </el-table-column>
-          <el-table-column label="规格" width="110">
+          <el-table-column label="规格" width="90">
             <template #default="scope"><span>{{ scope.row.spec || '-' }}</span></template>
           </el-table-column>
-          <el-table-column label="单位" width="80">
+          <el-table-column label="单位" width="60">
             <template #default="scope"><span>{{ scope.row.unit || '-' }}</span></template>
           </el-table-column>
-          <el-table-column label="数量" width="110">
+          <el-table-column label="批次号" width="150">
+            <template #default="scope">
+              <el-select v-model="scope.row.batchNo" filterable allow-create clearable default-first-option
+                placeholder="批次号" style="width:100%" @change="(v) => onBatchNoChange(scope.row, v)">
+                <el-option v-for="b in (scope.row.batchOptions || [])" :key="b.batchId" :label="b.batchNo" :value="b.batchNo">
+                  <span>{{ b.batchNo }}</span>
+                  <span style="float:right;color:var(--el-text-color-secondary);font-size:12px">
+                    {{ (b.expiryDate || '').slice(0, 10) }}
+                  </span>
+                </el-option>
+              </el-select>
+            </template>
+          </el-table-column>
+          <el-table-column label="生产日期" width="140">
+            <template #default="scope">
+              <el-date-picker v-model="scope.row.productionDate" type="date" value-format="YYYY-MM-DD" format="YYYY-MM-DD"
+                placeholder="生产日期" style="width:100%" />
+            </template>
+          </el-table-column>
+          <el-table-column label="保质期至" width="140">
+            <template #default="scope">
+              <el-date-picker v-model="scope.row.expiryDate" type="date" value-format="YYYY-MM-DD" format="YYYY-MM-DD"
+                placeholder="保质期至" style="width:100%" />
+            </template>
+          </el-table-column>
+          <el-table-column label="数量" width="100">
             <template #default="scope">
               <el-input-number v-model="scope.row.qty" :min="1" :precision="0" :controls-position="'right'" style="width:100%" @change="recalc" />
             </template>
@@ -172,6 +197,7 @@
 import { listPurchase, getPurchase, delPurchase, addPurchase, updatePurchase } from "@/api/beverage/purchase"
 import { listSupplier } from "@/api/beverage/supplier"
 import { listProduct } from "@/api/beverage/product"
+import { listBatch } from "@/api/beverage/batch"
 import { autoCreateReturn } from "@/api/beverage/return"
 import { parseTime } from "@/utils/ruoyi"
 import useUserStore from '@/store/modules/user'
@@ -212,6 +238,46 @@ function onProductChange(row, val) {
   row.unit = p.unit
   row.price = p.purchasePrice != null ? Number(p.purchasePrice) : 0
   if (!row.qty) row.qty = 1
+  // 选择商品后自动带出批次信息：优先该商品最近一次进货的批次，无历史则给建议值
+  loadBatchOptions(row)
+}
+
+/** 载入该商品已有批次；autoFill=true 时自动带出批次号/生产日期/保质期至（选择商品场景） */
+function loadBatchOptions(row, autoFill) {
+  if (!row.productId) return
+  const fill = autoFill !== false
+  listBatch({ productId: row.productId }).then(res => {
+    const list = res.data || res.rows || []
+    // 下拉只保留仍有效的批次（有存量或无存量但建档过的都保留，便于复用批次号）
+    row.batchOptions = list
+    // 最近一次建档的批次（batchId 最大）作为默认带出值
+    const recent = list.slice().sort((a, b) => (b.batchId || 0) - (a.batchId || 0))[0]
+    if (recent && fill) {
+      row.batchNo = recent.batchNo
+      row.productionDate = (recent.productionDate || '').toString().slice(0, 10) || row.productionDate
+      row.expiryDate = (recent.expiryDate || '').toString().slice(0, 10) || row.expiryDate
+    } else if (!recent && fill) {
+      // 无历史批次：给出建议值（批次号 B+进货日期，生产日期=今天，保质期=今天+180天）
+      const today = new Date()
+      const ymd = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`
+      if (!row.batchNo) row.batchNo = 'B' + ymd
+      if (!row.productionDate) row.productionDate = fmtDay(today)
+      if (!row.expiryDate) row.expiryDate = fmtDay(new Date(today.getTime() + 180 * 86400000))
+    }
+  }).catch(() => {})
+}
+
+/** 选中已有批次号时，同步带出该批次的生产日期/保质期至 */
+function onBatchNoChange(row, no) {
+  const hit = (row.batchOptions || []).find(b => b.batchNo === no)
+  if (hit) {
+    row.productionDate = (hit.productionDate || '').toString().slice(0, 10) || row.productionDate
+    row.expiryDate = (hit.expiryDate || '').toString().slice(0, 10) || row.expiryDate
+  }
+}
+
+function fmtDay(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
 const purchaseList = ref([])
@@ -270,7 +336,7 @@ function recalc() { /* 触发 computedTotal 刷新 */ }
 
 function addItem() {
   if (!form.value.items) form.value.items = []
-  form.value.items.push({ productId: undefined, productName: '', spec: '', unit: '箱', qty: 1, price: 0 })
+  form.value.items.push({ productId: undefined, productName: '', spec: '', unit: '箱', qty: 1, price: 0, batchOptions: [] })
 }
 
 function removeItem(index) {
@@ -342,6 +408,8 @@ function handleUpdate(row) {
   getPurchase(purchaseId).then(res => {
     form.value = res.data
     if (!form.value.items) form.value.items = []
+    // 载入已有明细行的批次下拉（保持批次号可正常回显并可切换，不覆盖已存值）
+    form.value.items.forEach(it => { loadBatchOptions(it, false) })
     open.value = true
     title.value = "修改进货单"
   })
@@ -391,7 +459,29 @@ function goReturn(row) {
 function submitForm() {
   proxy.$refs["purchaseRef"].validate(valid => {
     if (valid) {
+      // 批次信息校验：批次号与保质期至缺失时提示（选择商品后会自动带出，一般无需手填）
+      const items = form.value.items || []
+      for (let i = 0; i < items.length; i++) {
+        const it = items[i]
+        if (!it.batchNo || !String(it.batchNo).trim()) {
+          proxy.$modal.msgError('第 ' + (i + 1) + ' 行缺少批次号，请选择商品自动带出或手工填写')
+          return
+        }
+        if (!it.expiryDate) {
+          proxy.$modal.msgError('第 ' + (i + 1) + ' 行缺少「保质期至」，请填写（批次 ' + it.batchNo + '）')
+          return
+        }
+        if (it.productionDate && it.expiryDate && it.productionDate > it.expiryDate) {
+          proxy.$modal.msgError('第 ' + (i + 1) + ' 行生产日期不能晚于保质期至')
+          return
+        }
+      }
       const payload = JSON.parse(JSON.stringify(form.value))
+      // 批次下拉选项是前端辅助数据，不提交到后端
+      payload.items = (payload.items || []).map(it => {
+        const { batchOptions, ...rest } = it
+        return rest
+      })
       payload.totalAmount = computedTotal.value
       if (form.value.purchaseId != undefined) {
         updatePurchase(payload).then(() => {

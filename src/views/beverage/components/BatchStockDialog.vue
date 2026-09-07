@@ -84,6 +84,17 @@ function delta(b) {
 }
 const totalDelta = computed(() => batches.value.reduce((s, b) => s + delta(b), 0))
 
+/** 日期是否有改动（仅改日期也需提交，用于修正批次的生产日期/保质期） */
+function dateChanged(b) {
+  if (!b.batchId) return false
+  return (b.productionDate || '') !== (b.origProductionDate || '')
+      || (b.expiryDate || '') !== (b.origExpiryDate || '')
+}
+/** 该行是否需要提交（数量变动 或 日期修正） */
+function isDirty(b) {
+  return delta(b) !== 0 || dateChanged(b)
+}
+
 /** 打开：加载商品信息与现有批次 */
 function open(productId) {
   loading.value = true
@@ -99,6 +110,8 @@ function open(productId) {
       batchNo: b.batchNo,
       productionDate: b.productionDate ? String(b.productionDate).slice(0, 10) : undefined,
       expiryDate: b.expiryDate ? String(b.expiryDate).slice(0, 10) : undefined,
+      origProductionDate: b.productionDate ? String(b.productionDate).slice(0, 10) : undefined,
+      origExpiryDate: b.expiryDate ? String(b.expiryDate).slice(0, 10) : undefined,
       qty: Number(b.qty) || 0,
       origQty: Number(b.qty) || 0
     }))
@@ -119,7 +132,7 @@ function addBatch() {
 function submit() {
   if (!target.value) return
   const rows = batches.value
-  const changed = rows.filter(b => delta(b) !== 0)
+  const changed = rows.filter(b => isDirty(b))
   // 校验发生变动的批次行：批次号/保质期至必填
   for (let i = 0; i < changed.length; i++) {
     const b = changed[i]
@@ -138,7 +151,7 @@ function submit() {
   }
   // 与未变动批次之间批次号重复校验
   const changedNos = changed.map(b => (b.batchNo || '').trim())
-  const otherNos = rows.filter(b => delta(b) === 0).map(b => (b.batchNo || '').trim()).filter(Boolean)
+  const otherNos = rows.filter(b => !isDirty(b)).map(b => (b.batchNo || '').trim()).filter(Boolean)
   if (changedNos.some(n => otherNos.includes(n))) {
     proxy.$modal.msgError('批次号与已有批次重复，请检查')
     return
@@ -147,7 +160,7 @@ function submit() {
     proxy.$modal.msgError('存在重复的批次号，请检查')
     return
   }
-  // 只提交发生数量变动的批次（后端按批次差额联动总量并写台账）
+  // 提交发生变动的批次（数量变动 / 仅日期修正）
   const payload = changed.map(b => ({
     productId: target.value.productId,
     batchId: b.batchId,
@@ -157,7 +170,7 @@ function submit() {
     qty: Number(b.qty) || 0
   }))
   if (payload.length === 0) {
-    proxy.$modal.msgWarning("批次数量没有变化")
+    proxy.$modal.msgWarning("批次信息没有变化")
     return
   }
   updateProductStock(payload).then(() => {
