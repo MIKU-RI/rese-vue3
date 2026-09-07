@@ -80,7 +80,7 @@
       </el-table-column>
       <el-table-column label="操作" align="center" width="210" class-name="small-padding fixed-width">
         <template #default="scope">
-          <el-button link type="primary" icon="View" @click="handleDetail(scope.row)">明细</el-button>
+          <el-button v-if="scope.row.status === '1'" link type="primary" icon="View" @click="handleDetail(scope.row)">明细</el-button>
           <el-button v-if="scope.row.status === '0'" link type="success" icon="Top" @click="handleApply(scope.row)" v-hasPermi="['beverage:return:edit']">退货</el-button>
           <el-button v-if="scope.row.status === '1'" link type="warning" icon="Bottom" @click="handleReverse(scope.row)" v-hasPermi="['beverage:return:edit']">撤销退货</el-button>
           <el-button v-if="scope.row.status === '0'" link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['beverage:return:edit']">修改</el-button>
