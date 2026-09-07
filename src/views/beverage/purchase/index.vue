@@ -51,9 +51,10 @@
       <el-table-column label="创建时间" align="center" prop="createTime" width="160">
         <template #default="scope"><span>{{ parseTime(scope.row.createTime) }}</span></template>
       </el-table-column>
-      <el-table-column label="操作" align="center" width="240" class-name="small-padding fixed-width">
+      <el-table-column label="操作" align="center" width="300" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-button v-if="scope.row.status === '1'" link type="primary" icon="View" @click="handleDetail(scope.row)">明细</el-button>
+          <el-button v-if="scope.row.status === '1'" link type="warning" icon="Wallet" @click="openPay(scope.row)" v-hasPermi="['beverage:settlement:add']">付款</el-button>
           <el-button v-if="scope.row.status === '0'" link type="success" icon="Bottom" @click="handleInbound(scope.row)" v-hasPermi="['beverage:purchase:edit']">入库</el-button>
           <el-button v-if="scope.row.status === '1'" link type="danger" icon="RefreshLeft" @click="goReturn(scope.row)" :disabled="returning || allReturned(scope.row)" :title="allReturned(scope.row) ? '该单已全部退货，无剩余可退数量' : ''" v-hasPermi="['beverage:return:add']">退货</el-button>
           <el-button v-if="scope.row.status === '1' && isAdmin" link type="warning" icon="Top" @click="handleReverseInbound(scope.row)" :disabled="hasReturn(scope.row)" :title="hasReturn(scope.row) ? '该单已产生退货记录，不可撤销入库；如需调整请通过「采购退货单」处理' : ''" v-hasPermi="['beverage:purchase:edit']">撤销入库</el-button>
@@ -190,6 +191,7 @@
 
     <!-- 退货预览确认：先预览原单可退商品并调整数量，确认后再生成退货单（不再一键直接生成） -->
     <ReturnPreviewDialog v-model="returnOpen" source-type="1" :source-id="returnRow.purchaseId" :source-no="returnRow.purchaseNo" @success="getList" />
+    <SettlementDialog v-model="settleOpen" biz-type="2" :preset-related-id="settleRow.purchaseId" :preset-counterparty-id="settleRow.supplierId" @success="getList" />
   </div>
 </template>
 
@@ -199,6 +201,7 @@ import { listSupplier } from "@/api/beverage/supplier"
 import { listProduct } from "@/api/beverage/product"
 import { listBatch } from "@/api/beverage/batch"
 import ReturnPreviewDialog from "@/views/beverage/components/ReturnPreviewDialog.vue"
+import SettlementDialog from "@/views/beverage/components/SettlementDialog.vue"
 import { parseTime } from "@/utils/ruoyi"
 import useUserStore from '@/store/modules/user'
 
@@ -505,6 +508,15 @@ function goReturn(row) {
   returnRow.purchaseId = row.purchaseId
   returnRow.purchaseNo = row.purchaseNo
   returnOpen.value = true
+}
+
+// 付款登记：预填供应商与采购单，唤起共享收付款弹窗
+const settleOpen = ref(false)
+const settleRow = reactive({ purchaseId: undefined, supplierId: undefined })
+function openPay(row) {
+  settleRow.purchaseId = row.purchaseId
+  settleRow.supplierId = row.supplierId
+  settleOpen.value = true
 }
 
 function submitForm() {

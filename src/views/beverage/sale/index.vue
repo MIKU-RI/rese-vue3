@@ -54,6 +54,7 @@
       <el-table-column label="操作" align="center" width="240" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-button v-if="scope.row.status === '1'" link type="primary" icon="View" @click="handleDetail(scope.row)">明细</el-button>
+          <el-button v-if="scope.row.status === '1'" link type="success" icon="Wallet" @click="openReceive(scope.row)" v-hasPermi="['beverage:settlement:add']">收款</el-button>
           <el-button v-if="scope.row.status === '0'" link type="success" icon="Bottom" @click="handleOutbound(scope.row)" v-hasPermi="['beverage:sale:edit']">出库</el-button>
           <el-button v-if="scope.row.status === '1'" link type="danger" icon="RefreshLeft" @click="goReturn(scope.row)" :disabled="returning || allReturned(scope.row)" :title="allReturned(scope.row) ? '该单已全部退货，无剩余可退数量' : ''" v-hasPermi="['beverage:return:add']">退货</el-button>
           <el-button v-if="scope.row.status === '1' && isAdmin" link type="warning" icon="Top" @click="handleReverseOutbound(scope.row)" :disabled="hasReturn(scope.row)" :title="hasReturn(scope.row) ? '该单已产生退货记录，不可撤销出库；如需调整请通过「销售退货单」处理' : ''" v-hasPermi="['beverage:sale:edit']">撤销出库</el-button>
@@ -166,6 +167,7 @@
 
     <!-- 退货预览确认：先预览原单可退商品并调整数量，确认后再生成退货单（不再一键直接生成） -->
     <ReturnPreviewDialog v-model="returnOpen" source-type="2" :source-id="returnRow.saleId" :source-no="returnRow.saleNo" @success="getList" />
+    <SettlementDialog v-model="settleOpen" biz-type="1" :preset-related-id="settleRow.saleId" :preset-counterparty-id="settleRow.customerId" @success="getList" />
   </div>
 </template>
 
@@ -174,6 +176,7 @@ import { listSale, getSale, delSale, addSale, updateSale } from "@/api/beverage/
 import { listCustomer } from "@/api/beverage/customer"
 import { listProduct } from "@/api/beverage/product"
 import ReturnPreviewDialog from "@/views/beverage/components/ReturnPreviewDialog.vue"
+import SettlementDialog from "@/views/beverage/components/SettlementDialog.vue"
 import { parseTime } from "@/utils/ruoyi"
 import useUserStore from '@/store/modules/user'
 
@@ -440,6 +443,15 @@ function goReturn(row) {
   returnRow.saleId = row.saleId
   returnRow.saleNo = row.saleNo
   returnOpen.value = true
+}
+
+// 收款登记：预填客户与销售单，唤起共享收付款弹窗
+const settleOpen = ref(false)
+const settleRow = reactive({ saleId: undefined, customerId: undefined })
+function openReceive(row) {
+  settleRow.saleId = row.saleId
+  settleRow.customerId = row.customerId
+  settleOpen.value = true
 }
 
 function submitForm() {
