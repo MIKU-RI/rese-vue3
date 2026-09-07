@@ -41,14 +41,11 @@
       <el-table-column label="总金额" align="center" prop="totalAmount" width="120">
         <template #default="scope">¥ {{ formatMoney(scope.row.totalAmount) }}</template>
       </el-table-column>
-      <el-table-column label="状态" align="center" prop="status" width="120">
+      <el-table-column label="状态" align="center" prop="status" width="170">
         <template #default="scope">
-          <el-tag v-if="scope.row.returnStatus === '3'" type="info">已退货</el-tag>
-          <el-tag v-else-if="scope.row.returnStatus === '2'" type="warning">
-            部分退货 {{ scope.row.returnQty }}/{{ scope.row.totalQty }}
-          </el-tag>
-          <el-tag v-else-if="scope.row.returnStatus === '1'" type="warning">退货中</el-tag>
-          <el-tag v-else :type="scope.row.status === '0' ? 'warning' : 'success'">{{ scope.row.status === '0' ? '待入库' : '已入库' }}</el-tag>
+          <el-tooltip :content="returnTip(scope.row)" placement="top" :disabled="!hasReturn(scope.row)">
+            <el-tag :type="statusTagType(scope.row)">{{ statusText(scope.row) }}</el-tag>
+          </el-tooltip>
         </template>
       </el-table-column>
       <el-table-column label="创建时间" align="center" prop="createTime" width="160">
@@ -217,6 +214,35 @@ const isAdmin = computed(() => {
 // returnStatus: 0未退货 1退货中 2部分退货 3已退货(全部退完)
 const hasReturn = (row) => !!row.returnStatus && row.returnStatus !== '0'
 const allReturned = (row) => row.returnStatus === '3'
+
+// 状态栏：出入库状态 + 退货进度合并为一个标签
+// 颜色跟随出入库状态（部分退货与「已入库」同色=绿色），整单全退才弱化为灰色
+// 退货进度用百分比展示，具体件数（原单/已退/剩余/待执行）放到标签悬停提示里
+function statusTagType(row) {
+  if (row.returnStatus === '3') return 'info'
+  return row.status === '0' ? 'warning' : 'success'
+}
+function returnPercent(row) {
+  const total = Number(row.totalQty) || 0
+  if (!total) return 0
+  const val = row.returnStatus === '1' ? (Number(row.pendingReturnQty) || 0) : (Number(row.returnQty) || 0)
+  return Math.min(100, Math.round(val * 100 / total))
+}
+function statusText(row) {
+  const base = row.status === '0' ? '待入库' : '已入库'
+  if (!hasReturn(row)) return base
+  if (row.returnStatus === '3') return base + ' · 已全退 100%'
+  if (row.returnStatus === '1') return base + ' · 退货中 ' + returnPercent(row) + '%'
+  return base + ' · 已退 ' + returnPercent(row) + '%'
+}
+function returnTip(row) {
+  const total = Number(row.totalQty) || 0
+  const done = Number(row.returnQty) || 0
+  const pending = Number(row.pendingReturnQty) || 0
+  let tip = '原单 ' + total + '，已退 ' + done + '，剩余可退 ' + Math.max(0, total - done)
+  if (pending > 0) tip += '，待执行退货 ' + pending
+  return tip
+}
 
 // 已入库（或已产生退货）的单据不可修改/删除：需先由超管「撤销入库」回到待入库态
 const lockedRow = (row) => !!row && (row.status === '1' || hasReturn(row))
