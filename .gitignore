@@ -21,3 +21,6 @@ selenium-debug.log
 
 package-lock.json
 yarn.lock
+
+# WorkBuddy 本地记忆目录（不入库）
+.workbuddy/
