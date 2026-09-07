@@ -220,6 +220,8 @@ const allReturned = (row) => row.returnStatus === '3'
 // 退货进度用百分比展示，具体件数（原单/已退/剩余/待执行）放到标签悬停提示里
 function statusTagType(row) {
   if (row.returnStatus === '3') return 'info'
+  // 退货中：仅有待执行退货单、尚未生效，与「待入库」同为橙色提示
+  if (row.returnStatus === '1') return 'warning'
   return row.status === '0' ? 'warning' : 'success'
 }
 function returnPercent(row) {
