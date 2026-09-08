@@ -53,6 +53,9 @@
           </template>
           <div v-if="!currentWarehouse" class="empty-tip">点击左侧行查看该仓库存分布</div>
           <div v-else>
+            <el-input v-model="distKeyword" size="small" placeholder="商品名称模糊搜索，回车查询" clearable style="margin-bottom: 8px" @keyup.enter="handleDistSearch" @clear="handleDistClear">
+              <template #append><el-button icon="Search" @click="handleDistSearch" /></template>
+            </el-input>
             <el-table :data="distList" size="small" max-height="560" border>
               <el-table-column label="商品" prop="productName" min-width="120" show-overflow-tooltip />
               <el-table-column label="规格" prop="spec" width="80" align="center" />
@@ -273,10 +276,24 @@ function handleRowClick(row) {
   loadDist(row.warehouseId)
 }
 
+const distKeyword = ref('')
+
+/** 库存分布：按商品名称模糊过滤（后端 LIKE） */
 function loadDist(warehouseId) {
-  listInventory({ warehouseId }).then(res => {
+  listInventory({ warehouseId, productName: distKeyword.value || undefined }).then(res => {
     distList.value = res.rows || res.data || []
   })
+}
+
+function handleDistSearch() {
+  if (currentWarehouse.value) {
+    loadDist(currentWarehouse.value.warehouseId)
+  }
+}
+
+function handleDistClear() {
+  distKeyword.value = ''
+  handleDistSearch()
 }
 
 onMounted(() => {
