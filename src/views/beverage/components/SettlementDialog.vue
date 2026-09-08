@@ -20,6 +20,9 @@
       </el-form-item>
       <el-form-item label="未结余额">
         <span style="color: #f56c6c; font-weight: 700">¥ {{ unpaidText }}</span>
+        <el-tag v-if="currentDoc && (Number(currentDoc.returnAmount) || 0) > 0" type="warning" size="small" style="margin-left:8px">
+          已退 ¥{{ (Number(currentDoc.returnAmount) || 0).toFixed(2) }}
+        </el-tag>
       </el-form-item>
       <el-form-item label="金额" prop="amount">
         <el-input-number v-model="form.amount" :min="0" :max="maxAmount" :precision="2" :step="10"
@@ -77,8 +80,14 @@ const counterpartyOptions = ref([])
 const docOptions = ref([])
 const currentDoc = ref(null)
 
-const unpaid = computed(() =>
-  currentDoc.value ? (Number(currentDoc.value.totalAmount) - Number(currentDoc.value.paidAmount)) : 0)
+// 净应收/净应付 = 原单金额 − 已退货金额(已生效) − 已收/已付
+function docNet(row) {
+  const total = Number(row.totalAmount) || 0
+  const ret = Number(row.returnAmount) || 0
+  const paid = Number(row.paidAmount) || 0
+  return Math.max(0, total - ret - paid)
+}
+const unpaid = computed(() => currentDoc.value ? docNet(currentDoc.value) : 0)
 const unpaidText = computed(() => unpaid.value.toFixed(2))
 const maxAmount = computed(() => unpaid.value)
 
@@ -136,11 +145,14 @@ function buildDocs(rows) {
   const word = form.bizType === '1' ? '应收' : '应付'
   return rows.map(d => {
     const total = Number(d.totalAmount) || 0
+    const ret = Number(d.returnAmount) || 0
     const paid = Number(d.paidAmount) || 0
-    const un = total - paid
+    const net = Math.max(0, total - ret)
+    const un = Math.max(0, net - paid)
     return {
-      id: d.saleId || d.purchaseId, doc: d, totalAmount: total, paidAmount: paid, un,
-      label: (d.saleNo || d.purchaseNo) + '  ' + word + '¥' + un.toFixed(2)
+      id: d.saleId || d.purchaseId, doc: d, totalAmount: total, returnAmount: ret,
+      paidAmount: paid, netAmount: net, un,
+      label: (d.saleNo || d.purchaseNo) + '  净' + word + '¥' + un.toFixed(2)
     }
   }).filter(x => x.un > 0)
 }

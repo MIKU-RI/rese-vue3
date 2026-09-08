@@ -20,10 +20,15 @@
               <el-table :data="docMap[props.row.counterpartyId] || []" size="small" style="margin: 0 40px">
                 <el-table-column label="销售单号" prop="saleNo" />
                 <el-table-column label="日期" prop="saleDate" width="120" />
-                <el-table-column label="应收总额" prop="totalAmount" align="right" :formatter="fmtMoney" />
+                <el-table-column label="销售单号" prop="saleNo" />
+                <el-table-column label="日期" prop="saleDate" width="110" />
+                <el-table-column label="原应收" prop="totalAmount" align="right" :formatter="fmtMoney" />
+                <el-table-column label="已退货" align="right" width="90">
+                  <template #default="s">¥{{ (Number(s.row.returnAmount) || 0).toFixed(2) }}</template>
+                </el-table-column>
                 <el-table-column label="已收" prop="paidAmount" align="right" :formatter="fmtMoney2" />
-                <el-table-column label="未收" align="right" width="120">
-                  <template #default="s"><span style="color:#f56c6c">¥{{ (Number(s.row.totalAmount) - Number(s.row.paidAmount)).toFixed(2) }}</span></template>
+                <el-table-column label="净未收" align="right" width="110">
+                  <template #default="s"><span style="color:#f56c6c">¥{{ docNet(s.row).toFixed(2) }}</span></template>
                 </el-table-column>
                 <el-table-column label="状态" width="100">
                   <template #default="s"><el-tag :type="settleTag(s.row.settleStatus)">{{ settleText(s.row.settleStatus) }}</el-tag></template>
@@ -34,8 +39,11 @@
           <el-table-column label="客户" prop="counterpartyName" />
           <el-table-column label="单据数" prop="billCount" width="90" align="center" />
           <el-table-column label="应收总额" prop="totalAmount" align="right" :formatter="fmtMoney" />
+          <el-table-column label="已退货" align="right" width="100">
+            <template #default="r"><span style="color:#e6a23c">{{ (Number(r.row.returnAmount) || 0) > 0 ? ('¥' + Number(r.row.returnAmount).toFixed(2)) : '¥0.00' }}</span></template>
+          </el-table-column>
           <el-table-column label="已收" prop="paidAmount" align="right" :formatter="fmtMoney2" />
-          <el-table-column label="未收" align="right" width="130">
+          <el-table-column label="净未收" align="right" width="130">
             <template #default="r"><span style="color:#f56c6c;font-weight:700">¥{{ Number(r.row.unpaid).toFixed(2) }}</span></template>
           </el-table-column>
           <el-table-column label="状态" width="100">
@@ -57,11 +65,14 @@
             <template #default="props">
               <el-table :data="docMap[props.row.counterpartyId] || []" size="small" style="margin: 0 40px">
                 <el-table-column label="采购单号" prop="purchaseNo" />
-                <el-table-column label="日期" prop="purchaseDate" width="120" />
-                <el-table-column label="应付总额" prop="totalAmount" align="right" :formatter="fmtMoney" />
+                <el-table-column label="日期" prop="purchaseDate" width="110" />
+                <el-table-column label="原应付" prop="totalAmount" align="right" :formatter="fmtMoney" />
+                <el-table-column label="已退货" align="right" width="90">
+                  <template #default="s">¥{{ (Number(s.row.returnAmount) || 0).toFixed(2) }}</template>
+                </el-table-column>
                 <el-table-column label="已付" prop="paidAmount" align="right" :formatter="fmtMoney2" />
-                <el-table-column label="未付" align="right" width="120">
-                  <template #default="s"><span style="color:#f56c6c">¥{{ (Number(s.row.totalAmount) - Number(s.row.paidAmount)).toFixed(2) }}</span></template>
+                <el-table-column label="净未付" align="right" width="110">
+                  <template #default="s"><span style="color:#f56c6c">¥{{ docNet(s.row).toFixed(2) }}</span></template>
                 </el-table-column>
                 <el-table-column label="状态" width="100">
                   <template #default="s"><el-tag :type="settleTag(s.row.settleStatus)">{{ settleText(s.row.settleStatus) }}</el-tag></template>
@@ -72,8 +83,11 @@
           <el-table-column label="供应商" prop="counterpartyName" />
           <el-table-column label="单据数" prop="billCount" width="90" align="center" />
           <el-table-column label="应付总额" prop="totalAmount" align="right" :formatter="fmtMoney" />
+          <el-table-column label="已退货" align="right" width="100">
+            <template #default="r"><span style="color:#e6a23c">{{ (Number(r.row.returnAmount) || 0) > 0 ? ('¥' + Number(r.row.returnAmount).toFixed(2)) : '¥0.00' }}</span></template>
+          </el-table-column>
           <el-table-column label="已付" prop="paidAmount" align="right" :formatter="fmtMoney2" />
-          <el-table-column label="未付" align="right" width="130">
+          <el-table-column label="净未付" align="right" width="130">
             <template #default="r"><span style="color:#f56c6c;font-weight:700">¥{{ Number(r.row.unpaid).toFixed(2) }}</span></template>
           </el-table-column>
           <el-table-column label="状态" width="100">
@@ -114,6 +128,14 @@ const dialogCpId = ref(null)
 
 const fmtMoney = (r, c, v) => '¥ ' + Number(v || 0).toFixed(2)
 const fmtMoney2 = (r, c, v) => '¥ ' + Number(v || 0).toFixed(2)
+
+// 单张单据净应收/净应付 = 原单金额 − 已退货(已生效) − 已收/已付（不小于0）
+function docNet(row) {
+  const total = Number(row.totalAmount) || 0
+  const ret = Number(row.returnAmount) || 0
+  const paid = Number(row.paidAmount) || 0
+  return Math.max(0, total - ret - paid)
+}
 
 function settleText(s) {
   return s === '2' ? '已清' : s === '1' ? '部分' : '未结'

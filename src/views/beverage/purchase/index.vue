@@ -56,8 +56,8 @@
           <el-button v-if="scope.row.status === '1'" link type="primary" icon="View" @click="handleDetail(scope.row)">明细</el-button>
           <el-button v-if="scope.row.status === '1' && scope.row.settleStatus !== '2'" link type="warning" icon="Wallet" @click="openPay(scope.row)" v-hasPermi="['beverage:settlement:add']">已付款</el-button>
           <el-button v-if="scope.row.status === '0'" link type="success" icon="Bottom" @click="handleInbound(scope.row)" v-hasPermi="['beverage:purchase:edit']">入库</el-button>
-          <el-button v-if="scope.row.status === '1'" link type="danger" icon="RefreshLeft" @click="goReturn(scope.row)" :disabled="returning || allReturned(scope.row)" :title="allReturned(scope.row) ? '该单已全部退货，无剩余可退数量' : ''" v-hasPermi="['beverage:return:add']">退货</el-button>
-          <el-button v-if="scope.row.status === '1' && isAdmin && scope.row.settleStatus !== '2'" link type="warning" icon="Top" @click="handleReverseInbound(scope.row)" :disabled="hasReturn(scope.row)" :title="hasReturn(scope.row) ? '该单已产生退货记录，不可撤销入库；如需调整请通过「采购退货单」处理' : (scope.row.settleStatus === '2' ? '已结清单据不可撤销入库' : '')" v-hasPermi="['beverage:purchase:edit']">撤销入库</el-button>
+          <el-button v-if="scope.row.status === '1' && scope.row.settleStatus === '2'" link type="danger" icon="RefreshLeft" @click="goReturn(scope.row)" :disabled="returning || allReturned(scope.row)" :title="allReturned(scope.row) ? '该单已全部退款，无剩余可退数量' : ''" v-hasPermi="['beverage:return:add']">退货</el-button>
+          <el-button v-if="scope.row.status === '1' && scope.row.settleStatus !== '2'" link type="warning" icon="Top" @click="handleReverseInbound(scope.row)" :disabled="hasReturn(scope.row)" :title="hasReturn(scope.row) ? '该单已产生退货记录，不可撤销入库' : '未结清的单据如需纠错，可直接撤销入库'" v-hasPermi="['beverage:purchase:edit']">撤销入库</el-button>
           <el-button v-if="scope.row.status === '0' && !hasReturn(scope.row)" link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['beverage:purchase:edit']">修改</el-button>
           <el-button v-if="scope.row.status === '0' && !hasReturn(scope.row)" link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['beverage:purchase:remove']">删除</el-button>
         </template>
@@ -239,14 +239,13 @@ const isAdmin = computed(() => {
 const hasReturn = (row) => !!row.returnStatus && row.returnStatus !== '0'
 const allReturned = (row) => row.returnStatus === '3'
 
-// 状态栏：出入库状态 + 退货进度合并为一个标签
-// 颜色跟随出入库状态（部分退货与「已入库」同色=绿色），整单全退才弱化为灰色
-// 退货进度用百分比展示，具体件数（原单/已退/剩余/待执行）放到标签悬停提示里
+// 状态栏：按资金/退货口径展示，不再带「已入库」前缀
+// 已全退=已退款；部分退货=已结清·已退 x%（历史未结清的部分退货单显示「已退 x%」）；
+// 退货中=有待执行退货单；已结清；未结清；待入库
 function statusTagType(row) {
+  if (row.status === '0') return 'warning'
   if (row.returnStatus === '3') return 'info'
-  // 退货中：仅有待执行退货单、尚未生效，与「待入库」同为橙色提示
-  if (row.returnStatus === '1') return 'warning'
-  return row.status === '0' ? 'warning' : 'success'
+  return row.settleStatus === '2' ? 'success' : 'warning'
 }
 function returnPercent(row) {
   const total = Number(row.totalQty) || 0
@@ -255,12 +254,13 @@ function returnPercent(row) {
   return Math.min(100, Math.round(val * 100 / total))
 }
 function statusText(row) {
-  let base = row.status === '0' ? '待入库' : '已入库'
-  if (row.settleStatus === '2') base += '·已结清'
-  if (!hasReturn(row)) return base
-  if (row.returnStatus === '3') return base + ' · 已全退 100%'
-  if (row.returnStatus === '1') return base + ' · 退货中 ' + returnPercent(row) + '%'
-  return base + ' · 已退 ' + returnPercent(row) + '%'
+  if (row.status === '0') return '待入库'
+  if (row.returnStatus === '3') return '已退款'
+  if (row.returnStatus === '1') return '退货中 ' + returnPercent(row) + '%'
+  if (row.returnStatus === '2') {
+    return (row.settleStatus === '2' ? '已结清·已退 ' : '已退 ') + returnPercent(row) + '%'
+  }
+  return row.settleStatus === '2' ? '已结清' : '未结清'
 }
 function returnTip(row) {
   const total = Number(row.totalQty) || 0
