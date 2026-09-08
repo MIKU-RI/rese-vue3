@@ -82,6 +82,15 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
+            <el-form-item label="入库仓库" prop="warehouseId">
+              <el-select v-model="form.warehouseId" placeholder="请选择仓库" filterable style="width:100%">
+                <el-option v-for="w in warehouseOpts" :key="w.warehouseId" :label="w.warehouseName" :value="w.warehouseId" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row>
+          <el-col :span="12">
             <el-form-item label="进货日期" prop="purchaseDate">
               <el-date-picker v-model="form.purchaseDate" type="date" value-format="YYYY-MM-DD" format="YYYY-MM-DD" placeholder="选择日期" style="width: 100%" :disabled-date="disabledDocDate" />
               <div style="color:#909399;font-size:12px;line-height:1.4;">{{ dateRangeTip }}</div>
@@ -229,6 +238,7 @@ import { listPurchase, getPurchase, delPurchase, addPurchase, updatePurchase } f
 import DocPrint from "@/components/DocPrint/index.vue"
 import { listSupplier } from "@/api/beverage/supplier"
 import { listProduct } from "@/api/beverage/product"
+import { warehouseOptions } from "@/api/beverage/warehouse"
 import { listBatch } from "@/api/beverage/batch"
 import { settleInFull } from "@/api/beverage/settlement"
 import ReturnPreviewDialog from "@/views/beverage/components/ReturnPreviewDialog.vue"
@@ -289,6 +299,10 @@ const deleteLocked = computed(() => selectedRows.value.some(lockedRow))
 // 关联下拉数据
 const supplierOptions = ref([])
 const productOptions = ref([])
+const warehouseOpts = ref([])
+function loadWarehouses() {
+  warehouseOptions().then(res => { warehouseOpts.value = res.data || res.rows || [] }).catch(() => {})
+}
 
 function loadSuppliers() {
   listSupplier({ pageNum: 1, pageSize: 10000 }).then(res => { supplierOptions.value = res.rows || [] })
@@ -674,6 +688,7 @@ onMounted(() => {
   getList()
   loadSuppliers()
   loadProducts()
+  loadWarehouses()
 })
 </script>
 

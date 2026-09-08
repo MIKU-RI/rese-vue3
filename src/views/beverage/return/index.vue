@@ -108,12 +108,19 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="退货日期" prop="returnDate">
-              <el-date-picker v-model="form.returnDate" type="date" value-format="YYYY-MM-DD" format="YYYY-MM-DD" placeholder="选择日期" style="width: 100%" />
+            <el-form-item label="退货仓库" prop="warehouseId">
+              <el-select v-model="form.warehouseId" placeholder="请选择仓库" filterable style="width:100%">
+                <el-option v-for="w in warehouseOpts" :key="w.warehouseId" :label="w.warehouseName" :value="w.warehouseId" />
+              </el-select>
             </el-form-item>
           </el-col>
         </el-row>
         <el-row>
+          <el-col :span="12">
+            <el-form-item label="退货日期" prop="returnDate">
+              <el-date-picker v-model="form.returnDate" type="date" value-format="YYYY-MM-DD" format="YYYY-MM-DD" placeholder="选择日期" style="width: 100%" />
+            </el-form-item>
+          </el-col>
           <el-col :span="12">
             <el-form-item :label="isPurchaseReturn ? '供应商' : '客户'" prop="partnerId">
               <el-select v-model="form.partnerId" :placeholder="'请选择' + (isPurchaseReturn ? '供应商' : '客户')" filterable style="width:100%" @change="onPartnerChange" :disabled="sourceLocked">
@@ -122,6 +129,8 @@
               </el-select>
             </el-form-item>
           </el-col>
+        </el-row>
+        <el-row>
           <el-col :span="12">
             <el-form-item label="单据金额">
               <span style="color:#f56c6c;font-weight:bold;">¥ {{ formatMoney(computedTotal) }}</span>
@@ -235,6 +244,7 @@ import { listReturn, getReturn, delReturn, addReturn, updateReturn, getRemaining
 import { listSupplier } from "@/api/beverage/supplier"
 import { listCustomer } from "@/api/beverage/customer"
 import { listProduct } from "@/api/beverage/product"
+import { warehouseOptions } from "@/api/beverage/warehouse"
 import { getPurchase } from "@/api/beverage/purchase"
 import { getSale } from "@/api/beverage/sale"
 import { listPurchase } from "@/api/beverage/purchase"
@@ -251,6 +261,10 @@ const { proxy } = getCurrentInstance()
 const supplierOptions = ref([])
 const customerOptions = ref([])
 const productOptions = ref([])
+const warehouseOpts = ref([])
+function loadWarehouses() {
+  warehouseOptions().then(res => { warehouseOpts.value = res.data || res.rows || [] }).catch(() => {})
+}
 // 关联原单下拉（已入库采购单 / 已出库销售单）
 const sourceOptions = ref([])
 const loadingSource = ref(false)
@@ -356,6 +370,7 @@ function onSourceChange(sourceId) {
     if (isPurchaseReturn.value) {
       form.value.sourceId = d.purchaseId
       form.value.sourceNo = d.purchaseNo
+      form.value.warehouseId = d.warehouseId
       form.value.supplierId = d.supplierId
       form.value.supplierName = d.supplierName
       form.value.partnerId = d.supplierId
@@ -364,6 +379,7 @@ function onSourceChange(sourceId) {
     } else {
       form.value.sourceId = d.saleId
       form.value.sourceNo = d.saleNo
+      form.value.warehouseId = d.warehouseId
       form.value.customerId = d.customerId
       form.value.customerName = d.customerName
       form.value.partnerId = d.customerId
@@ -566,6 +582,7 @@ function reset() {
     supplierName: undefined,
     customerId: undefined,
     customerName: undefined,
+    warehouseId: undefined,
     returnDate: today(),
     status: '0',
     remark: undefined,
@@ -697,6 +714,7 @@ onMounted(() => {
   loadSuppliers()
   loadCustomers()
   loadProducts()
+  loadWarehouses()
   // 支持从采购/销售页点「退货」跳转带来源单进入，自动打开新增退货并带出明细
   const q = route.query
   if (q && q.sourceId) {

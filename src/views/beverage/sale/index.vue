@@ -82,6 +82,15 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
+            <el-form-item label="出库仓库" prop="warehouseId">
+              <el-select v-model="form.warehouseId" placeholder="请选择仓库" filterable style="width:100%">
+                <el-option v-for="w in warehouseOpts" :key="w.warehouseId" :label="w.warehouseName" :value="w.warehouseId" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row>
+          <el-col :span="12">
             <el-form-item label="出库日期" prop="saleDate">
               <el-date-picker v-model="form.saleDate" type="date" value-format="YYYY-MM-DD" format="YYYY-MM-DD" placeholder="选择日期" style="width: 100%" :disabled-date="disabledDocDate" />
               <div style="color:#909399;font-size:12px;line-height:1.4;">{{ dateRangeTip }}</div>
@@ -205,6 +214,7 @@ import { listSale, getSale, delSale, addSale, updateSale } from "@/api/beverage/
 import DocPrint from "@/components/DocPrint/index.vue"
 import { listCustomer } from "@/api/beverage/customer"
 import { listProduct } from "@/api/beverage/product"
+import { warehouseOptions } from "@/api/beverage/warehouse"
 import { settleInFull } from "@/api/beverage/settlement"
 import ReturnPreviewDialog from "@/views/beverage/components/ReturnPreviewDialog.vue"
 import { parseTime } from "@/utils/ruoyi"
@@ -264,6 +274,10 @@ const deleteLocked = computed(() => selectedRows.value.some(lockedRow))
 // 关联下拉数据
 const customerOptions = ref([])
 const productOptions = ref([])
+const warehouseOpts = ref([])
+function loadWarehouses() {
+  warehouseOptions().then(res => { warehouseOpts.value = res.data || res.rows || [] }).catch(() => {})
+}
 
 function loadCustomers() {
   listCustomer({ pageNum: 1, pageSize: 10000 }).then(res => { customerOptions.value = res.rows || [] })
@@ -455,6 +469,7 @@ function reset() {
     saleNo: undefined,
     customerName: undefined,
     saleDate: undefined,
+    warehouseId: undefined,
     status: '0',
     remark: undefined,
     items: []
@@ -587,6 +602,7 @@ onMounted(() => {
   getList()
   loadCustomers()
   loadProducts()
+  loadWarehouses()
 })
 </script>
 
