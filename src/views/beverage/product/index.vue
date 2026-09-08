@@ -72,6 +72,7 @@
               <el-button icon="Refresh" @click="getList">刷新</el-button>
               <el-button type="warning" plain icon="Money" @click="goBrandPrice()">品牌调价</el-button>
               <el-button type="success" plain icon="Box" @click="goBrandStock()" v-hasPermi="['beverage:product:stock']">品牌库存</el-button>
+              <el-button type="primary" plain icon="Calendar" @click="batchCreateRef.open()" v-hasPermi="['beverage:product:stock']">新增批次</el-button>
               <el-button type="primary" icon="Plus" @click="handleAdd" v-hasPermi="['beverage:product:add']">新增商品</el-button>
             </div>
           </div>
@@ -276,6 +277,7 @@
 
     <!-- 调整库存（单品·批次化，生成库存台账记录，仅超管） -->
     <BatchStockDialog ref="batchStockRef" @saved="getList" />
+    <BatchCreateDialog ref="batchCreateRef" @success="getList" />
   </div>
 </template>
 
@@ -283,6 +285,7 @@
 import { listProduct, getProduct, delProduct, addProduct, updateProduct } from "@/api/beverage/product"
 import { listBatch } from "@/api/beverage/batch"
 import BatchStockDialog from "../components/BatchStockDialog.vue"
+import BatchCreateDialog from "../components/BatchCreateDialog.vue"
 import ImageUpload from "@/components/ImageUpload"
 import { useDict } from "@/utils/dict"
 import { isExternal } from "@/utils/validate"
@@ -526,6 +529,7 @@ function submitForm() {
 
 /* ---------------- 调整库存（单品·批次化，生成台账） ---------------- */
 const batchStockRef = ref(null)
+const batchCreateRef = ref(null)
 function openStockAdjust(row) {
   const id = row && row.productId ? row.productId : (current.value ? current.value.productId : undefined)
   if (!id) return
