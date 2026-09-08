@@ -94,7 +94,8 @@
         <el-row>
           <el-col :span="12">
             <el-form-item label="调拨日期" prop="transferDate">
-              <el-date-picker v-model="form.transferDate" type="date" value-format="YYYY-MM-DD" format="YYYY-MM-DD" placeholder="选择日期" style="width: 100%" />
+              <el-date-picker v-model="form.transferDate" type="date" value-format="YYYY-MM-DD" format="YYYY-MM-DD" placeholder="选择日期" style="width: 100%" :disabled-date="disabledDocDate" />
+              <div style="color:#909399;font-size:12px;line-height:1.4;">{{ dateRangeTip }}</div>
             </el-form-item>
           </el-col>
           <el-col :span="12">
@@ -106,7 +107,7 @@
         <el-row>
           <el-col :span="24">
             <el-form-item label="状态">
-              <el-radio-group v-model="form.status">
+              <el-radio-group v-model="form.status" @change="onStatusChange">
                 <el-radio value="0">待调拨（仅登记，不动库存）</el-radio>
                 <el-radio value="1">已调拨（立即联动库存：出仓减、入仓加）</el-radio>
               </el-radio-group>
@@ -275,7 +276,10 @@ const data = reactive({
   rules: {
     fromWarehouseId: [{ required: true, message: "调出仓不能为空", trigger: "change" }],
     toWarehouseId: [{ required: true, message: "调入仓不能为空", trigger: "change" }],
-    transferDate: [{ required: true, message: "调拨日期不能为空", trigger: "change" }]
+    transferDate: [
+      { required: true, message: "调拨日期不能为空", trigger: "change" },
+      { validator: validateDocDate, trigger: "change" }
+    ]
   }
 })
 
@@ -289,6 +293,47 @@ const computedTotal = computed(() => {
 })
 
 function recalc() { /* 触发 computedTotal 刷新 */ }
+
+function todayStr() {
+  const t = new Date()
+  return t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0') + '-' + String(t.getDate()).padStart(2, '0')
+}
+
+/** 日期×状态交叉禁选：已调拨 ≤ 今天；待调拨 ≥ 今天（与后端校验一致） */
+function disabledDocDate(d) {
+  const t = new Date(); t.setHours(0, 0, 0, 0)
+  return form.value.status === '1' ? d.getTime() > t.getTime() : d.getTime() < t.getTime()
+}
+
+const dateRangeTip = computed(() => {
+  return form.value.status === '1'
+    ? '已调拨：只能选择今天(' + todayStr() + ')或更早的日期'
+    : '待调拨：只能选择今天(' + todayStr() + ')或更晚的日期'
+})
+
+function validateDocDate(rule, value, callback) {
+  if (!value) return callback()
+  const t = todayStr()
+  if (form.value.status === '1' && value > t) {
+    return callback(new Error('已调拨单据的调拨日期不能晚于今天（应≤' + t + '）'))
+  }
+  if (form.value.status === '0' && value < t) {
+    return callback(new Error('待调拨单据的调拨日期不能早于今天（应≥' + t + '）'))
+  }
+  callback()
+}
+
+/** 状态切换后，若已选日期违反新状态规则则提示并触发重校验 */
+function onStatusChange() {
+  const v = form.value.transferDate
+  const t = todayStr()
+  if (v && form.value.status === '1' && v > t) {
+    proxy.$modal.msgWarning('「已调拨」的日期不能晚于今天，请改选 ' + t + ' 或更早的日期')
+  } else if (v && form.value.status === '0' && v < t) {
+    proxy.$modal.msgWarning('「待调拨」的日期不能早于今天，请改选 ' + t + ' 或更晚的日期')
+  }
+  if (proxy.$refs.transferRef) proxy.$refs.transferRef.validateField('transferDate')
+}
 
 function addItem() {
   if (!form.value.items) form.value.items = []
