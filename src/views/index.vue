@@ -35,8 +35,28 @@
     <el-row :gutter="16" class="mt16">
       <el-col :xs="24" :sm="24" :md="12" :lg="12">
         <el-card shadow="hover">
-          <template #header><span class="card-title">近 7 日进销趋势（净额 · 已扣退货）</span></template>
-          <div ref="trendChart" class="chart"></div>
+          <template #header><span class="card-title">近 42 天进销日历（净额 · 已扣退货 · 灰格为无交易）</span></template>
+          <div class="cal-wrap">
+            <div ref="trendChart" class="chart cal-chart"></div>
+            <div class="cal-side">
+              <div class="cal-stat">
+                <div class="cal-stat-label">42 天净销售</div>
+                <div class="cal-stat-value" style="color:#2e7d32">{{ fmtMoney(trendSum('sale')) }}</div>
+              </div>
+              <div class="cal-stat">
+                <div class="cal-stat-label">42 天净进货</div>
+                <div class="cal-stat-value" style="color:#409EFF">{{ fmtMoney(trendSum('purchase')) }}</div>
+              </div>
+              <div class="cal-stat">
+                <div class="cal-stat-label">有交易天数</div>
+                <div class="cal-stat-value">{{ activeDays }}<span class="cal-stat-unit"> / 42 天</span></div>
+              </div>
+              <div class="cal-stat">
+                <div class="cal-stat-label">日均净销售</div>
+                <div class="cal-stat-value" style="color:#67C23A">{{ fmtMoney(trendSum('sale') / 42) }}</div>
+              </div>
+            </div>
+          </div>
         </el-card>
       </el-col>
       <el-col :xs="24" :sm="24" :md="12" :lg="12">
@@ -214,6 +234,16 @@ function trendSum(key) {
   const arr = (dashboard.value.trend || {})[key] || []
   return arr.reduce((s, v) => s + Number(v || 0), 0)
 }
+const activeDays = computed(() => {
+  const t = dashboard.value.trend || {}
+  const sale = t.sale || []
+  const purchase = t.purchase || []
+  let n = 0
+  for (let i = 0; i < sale.length; i++) {
+    if (Number(sale[i] || 0) > 0 || Number(purchase[i] || 0) > 0) n++
+  }
+  return n
+})
 
 const kpis = computed(() => {
   const k = dashboard.value.kpi || {}
@@ -239,16 +269,66 @@ let charts = []
 
 function renderTrend() {
   const t = dashboard.value.trend || { dates: [], purchase: [], sale: [] }
+  const dates = t.dates || []
+  const sale = (t.sale || []).map(v => Number(v || 0))
+  const purchase = (t.purchase || []).map(v => Number(v || 0))
+  const data = dates.map((d, i) => [d, sale[i]])
+  const maxVal = Math.max(...sale, 1)
   const c = echarts.init(trendChart.value)
   c.setOption({
-    tooltip: { trigger: 'axis' },
-    legend: { data: ['净进货额', '净销售额'] },
-    grid: { left: 60, right: 20, top: 40, bottom: 30 },
-    xAxis: { type: 'category', data: t.dates },
-    yAxis: { type: 'value' },
+    tooltip: {
+      formatter: p => {
+        const i = dates.indexOf(p.value[0])
+        return `<b>${p.value[0]}</b><br/>` +
+          `净销售额 ${fmtMoney(sale[i])}<br/>` +
+          `净进货额 ${fmtMoney(purchase[i])}` +
+          (sale[i] === 0 && purchase[i] === 0 ? '<br/><span style="color:#909399">无交易</span>' : '')
+      }
+    },
+    visualMap: {
+      min: 0,
+      max: maxVal,
+      type: 'continuous',
+      orient: 'horizontal',
+      left: 'center',
+      bottom: 0,
+      itemWidth: 12,
+      itemHeight: 90,
+      text: ['高', '低（灰=无交易）'],
+      calculable: false,
+      inRange: { color: ['#eef0f3', '#9fd6a4', '#57b45c', '#2e7d32'] }
+    },
+    calendar: {
+      orient: 'vertical',
+      range: [dates[0], dates[dates.length - 1]],
+      cellSize: [36, 31],
+      left: 46,
+      top: 28,
+      dayLabel: {
+        nameMap: ['日', '一', '二', '三', '四', '五', '六'],
+        firstDay: 0,
+        color: '#909399',
+        fontSize: 11
+      },
+      monthLabel: { color: '#909399', fontSize: 11 },
+      itemStyle: { color: '#eef0f3', borderColor: '#fff', borderWidth: 2 },
+      splitLine: { show: false },
+      yearLabel: { show: false }
+    },
     series: [
-      { name: '净进货额', type: 'line', smooth: true, data: t.purchase, areaStyle: { opacity: 0.08 } },
-      { name: '净销售额', type: 'line', smooth: true, data: t.sale, areaStyle: { opacity: 0.08 } }
+      {
+        name: '净销售额',
+        type: 'heatmap',
+        coordinateSystem: 'calendar',
+        data,
+        itemStyle: { borderRadius: 3 },
+        label: {
+          show: true,
+          fontSize: 9,
+          color: p => (Number(p.value[1]) / maxVal > 0.4 ? '#fff' : '#606266'),
+          formatter: p => Number(p.value[1]) > 0 ? Math.round(Number(p.value[1]) / 100) / 10 + 'k' : ''
+        }
+      }
     ]
   })
   return c
@@ -493,6 +573,40 @@ onBeforeUnmount(() => {
 .chart {
   width: 100%;
   height: 320px;
+}
+.cal-wrap {
+  display: flex;
+  align-items: stretch;
+  height: 320px;
+}
+.cal-chart {
+  flex: 1.5;
+  min-width: 0;
+  height: 100%;
+}
+.cal-side {
+  flex: 1;
+  min-width: 0;
+  border-left: 1px solid #ebeef5;
+  padding: 10px 4px 10px 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+}
+.cal-stat-label {
+  font-size: 12px;
+  color: #909399;
+}
+.cal-stat-value {
+  margin-top: 4px;
+  font-size: 20px;
+  font-weight: 700;
+  color: #303133;
+}
+.cal-stat-unit {
+  font-size: 12px;
+  font-weight: 400;
+  color: #909399;
 }
 .cat-wrap {
   display: flex;
