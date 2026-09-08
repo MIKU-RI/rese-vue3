@@ -54,23 +54,10 @@
       <el-table-column label="操作" align="center" width="240" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-button v-if="scope.row.status === '1'" link type="primary" icon="View" @click="handleDetail(scope.row)">明细</el-button>
-          <el-popconfirm :title="'确认将销售单【' + scope.row.saleNo + '】标记为客户已收款？'" width="320" @confirm="confirmReceive(scope.row)">
-            <template #reference>
-              <el-button v-if="scope.row.status === '1' && scope.row.settleStatus !== '2'" link type="success" icon="Wallet" v-hasPermi="['beverage:settlement:add']">已收款</el-button>
-            </template>
-            <template #default>
-              <div style="margin-bottom:8px;color:#606266;font-size:13px;">收款方式</div>
-              <el-select v-model="fullPayMethod" size="small" style="width:100%">
-                <el-option label="现金" value="1" />
-                <el-option label="银行" value="2" />
-                <el-option label="微信" value="3" />
-                <el-option label="支付宝" value="4" />
-              </el-select>
-            </template>
-          </el-popconfirm>
+          <el-button v-if="scope.row.status === '1' && scope.row.settleStatus !== '2'" link type="success" icon="Wallet" @click="openReceive(scope.row)" v-hasPermi="['beverage:settlement:add']">已收款</el-button>
           <el-button v-if="scope.row.status === '0'" link type="success" icon="Bottom" @click="handleOutbound(scope.row)" v-hasPermi="['beverage:sale:edit']">出库</el-button>
           <el-button v-if="scope.row.status === '1'" link type="danger" icon="RefreshLeft" @click="goReturn(scope.row)" :disabled="returning || allReturned(scope.row)" :title="allReturned(scope.row) ? '该单已全部退货，无剩余可退数量' : ''" v-hasPermi="['beverage:return:add']">退货</el-button>
-          <el-button v-if="scope.row.status === '1' && isAdmin" link type="warning" icon="Top" @click="handleReverseOutbound(scope.row)" :disabled="hasReturn(scope.row)" :title="hasReturn(scope.row) ? '该单已产生退货记录，不可撤销出库；如需调整请通过「销售退货单」处理' : ''" v-hasPermi="['beverage:sale:edit']">撤销出库</el-button>
+          <el-button v-if="scope.row.status === '1' && isAdmin && scope.row.settleStatus !== '2'" link type="warning" icon="Top" @click="handleReverseOutbound(scope.row)" :disabled="hasReturn(scope.row)" :title="hasReturn(scope.row) ? '该单已产生退货记录，不可撤销出库；如需调整请通过「销售退货单」处理' : (scope.row.settleStatus === '2' ? '已结清单据不可撤销出库' : '')" v-hasPermi="['beverage:sale:edit']">撤销出库</el-button>
           <el-button v-if="scope.row.status === '0' && !hasReturn(scope.row)" link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['beverage:sale:edit']">修改</el-button>
           <el-button v-if="scope.row.status === '0' && !hasReturn(scope.row)" link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['beverage:sale:remove']">删除</el-button>
         </template>
@@ -180,6 +167,28 @@
 
     <!-- 退货预览确认：先预览原单可退商品并调整数量，确认后再生成退货单（不再一键直接生成） -->
     <ReturnPreviewDialog v-model="returnOpen" source-type="2" :source-id="returnRow.saleId" :source-no="returnRow.saleNo" @success="getList" />
+
+    <!-- 一键结清：选择收款方式 -->
+    <el-dialog title="确认收款" v-model="fullPayOpen" width="360px" append-to-body>
+      <p style="margin:0 0 12px 0;">确认将销售单 <strong>{{ fullPayRow.saleNo }}</strong> 标记为客户已收款？</p>
+      <p style="margin:0 0 12px 0;color:#606266;font-size:13px;">将按剩余未收金额创建收款流水，并标记该单已结清。</p>
+      <el-form label-width="80px">
+        <el-form-item label="收款方式">
+          <el-select v-model="fullPayMethod" style="width:100%">
+            <el-option label="现金" value="1" />
+            <el-option label="银行" value="2" />
+            <el-option label="微信" value="3" />
+            <el-option label="支付宝" value="4" />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button type="primary" @click="doReceive">确 定</el-button>
+          <el-button @click="fullPayOpen = false">取 消</el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -221,7 +230,8 @@ function returnPercent(row) {
   return Math.min(100, Math.round(val * 100 / total))
 }
 function statusText(row) {
-  const base = row.status === '0' ? '待出库' : '已出库'
+  let base = row.status === '0' ? '待出库' : '已出库'
+  if (row.settleStatus === '2') base += '·已结清'
   if (!hasReturn(row)) return base
   if (row.returnStatus === '3') return base + ' · 已全退 100%'
   if (row.returnStatus === '1') return base + ' · 退货中 ' + returnPercent(row) + '%'
@@ -458,10 +468,19 @@ function goReturn(row) {
 }
 
 // 一键结清：标记客户已收款（按剩余金额创建流水并标记单据已结）
+const fullPayOpen = ref(false)
+const fullPayRow = reactive({ saleId: undefined, saleNo: '' })
 const fullPayMethod = ref("2")
-function confirmReceive(row) {
-  settleInFull({ bizType: "1", relatedId: row.saleId, payMethod: fullPayMethod.value }).then(() => {
+function openReceive(row) {
+  fullPayRow.saleId = row.saleId
+  fullPayRow.saleNo = row.saleNo
+  fullPayMethod.value = "2"
+  fullPayOpen.value = true
+}
+function doReceive() {
+  settleInFull({ bizType: "1", relatedId: fullPayRow.saleId, payMethod: fullPayMethod.value }).then(() => {
     proxy.$modal.msgSuccess("已标记为客户已收款")
+    fullPayOpen.value = false
     getList()
   }).catch(() => {})
 }
