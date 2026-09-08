@@ -20,6 +20,7 @@
         <el-option label="停用" value="1" />
       </el-select>
       <el-button type="primary" icon="Plus" @click="handleAdd" v-hasPermi="['beverage:customer:add']">新增客户</el-button>
+      <el-button type="warning" plain icon="Download" @click="handleExport" v-hasPermi="['beverage:customer:list']">导出</el-button>
     </div>
 
     <el-row :gutter="16" class="cb-body">
@@ -328,6 +329,11 @@ function reset() {
 function cancel() {
   open.value = false
   reset()
+}
+
+/** 导出按钮操作 */
+function handleExport() {
+  proxy.download("beverage/customer/export", {}, `customer_${new Date().getTime()}.xlsx`)
 }
 
 function handleAdd() {

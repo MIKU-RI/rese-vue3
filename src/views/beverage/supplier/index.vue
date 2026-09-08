@@ -31,6 +31,9 @@
         <el-button type="success" plain icon="Edit" :disabled="single" @click="handleUpdate" v-hasPermi="['beverage:supplier:edit']">修改</el-button>
       </el-col>
       <el-col :span="1.5">
+        <el-button type="warning" plain icon="Download" @click="handleExport" v-hasPermi="['beverage:supplier:list']">导出</el-button>
+      </el-col>
+      <el-col :span="1.5">
         <el-button type="danger" plain icon="Delete" :disabled="multiple" @click="handleDelete" v-hasPermi="['beverage:supplier:remove']">删除</el-button>
       </el-col>
       <right-toolbar v-model:showSearch="showSearch" @queryTable="getList"></right-toolbar>
@@ -174,6 +177,11 @@ const data = reactive({
 })
 
 const { queryParams, form, rules } = toRefs(data)
+
+/** 导出按钮操作 */
+function handleExport() {
+  proxy.download("beverage/supplier/export", { ...queryParams.value }, `supplier_${new Date().getTime()}.xlsx`)
+}
 
 function getList() {
   loading.value = true

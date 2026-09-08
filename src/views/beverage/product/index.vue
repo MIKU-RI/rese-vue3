@@ -74,6 +74,7 @@
               <el-button type="success" plain icon="Box" @click="goBrandStock()" v-hasPermi="['beverage:product:stock']">品牌库存</el-button>
               <el-button type="primary" plain icon="Calendar" @click="batchCreateRef.open()" v-hasPermi="['beverage:product:stock']">新增批次</el-button>
               <el-button type="primary" icon="Plus" @click="handleAdd" v-hasPermi="['beverage:product:add']">新增商品</el-button>
+              <el-button type="warning" plain icon="Download" @click="handleExport" v-hasPermi="['beverage:product:list']">导出</el-button>
             </div>
           </div>
         </el-card>
@@ -485,6 +486,11 @@ function cancel() {
 function onDialogClosed() {
   // 关闭后重置，避免 ImageUpload 缓存
   reset()
+}
+
+/** 导出按钮操作 */
+function handleExport() {
+  proxy.download("beverage/product/export", {}, `product_${new Date().getTime()}.xlsx`)
 }
 
 function handleAdd() {

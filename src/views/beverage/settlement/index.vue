@@ -32,6 +32,9 @@
         <el-button type="success" plain icon="Bottom" @click="openDialog('2')"
           v-hasPermi="['beverage:settlement:add']">付款登记</el-button>
       </el-col>
+      <el-col :span="1.5">
+        <el-button type="warning" plain icon="Download" @click="handleExport" v-hasPermi="['beverage:settlement:list']">导出</el-button>
+      </el-col>
     </el-row>
 
     <el-table :data="list" v-loading="loading">
@@ -97,6 +100,11 @@ function getList() {
     list.value = res.rows || []
     total.value = res.total || 0
   }).finally(() => { loading.value = false })
+}
+
+/** 导出按钮操作 */
+function handleExport() {
+  proxy.download("beverage/settlement/export", { ...queryParams }, `settlement_${new Date().getTime()}.xlsx`)
 }
 
 function handleQuery() {

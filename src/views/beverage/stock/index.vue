@@ -61,7 +61,10 @@
         </span>
       </el-col>
       <el-col :span="12" style="text-align: right">
-        <right-toolbar v-model:showSearch="showSearch" @queryTable="getList"></right-toolbar>
+        <el-col :span="1.5">
+        <el-button type="warning" plain icon="Download" @click="handleExport" v-hasPermi="['beverage:stock:list']">导出</el-button>
+      </el-col>
+      <right-toolbar v-model:showSearch="showSearch" @queryTable="getList"></right-toolbar>
       </el-col>
     </el-row>
 
@@ -367,6 +370,11 @@ function loadSummary() {
 const totalStockQty = computed(() => summaryList.value.reduce((s, x) => s + (Number(x.currentQty) || 0), 0))
 
 // ===== 列表 =====
+/** 导出按钮操作 */
+function handleExport() {
+  proxy.download("beverage/stock/export", { ...queryParams.value }, `stock_${new Date().getTime()}.xlsx`)
+}
+
 function getList() {
   loading.value = true
   listStock(queryParams.value).then(res => {

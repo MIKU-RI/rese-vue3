@@ -9,6 +9,12 @@
         <el-button type="success" plain icon="Bottom" @click="openDialog('2', null)"
           v-hasPermi="['beverage:settlement:add']">付款登记</el-button>
       </el-col>
+      <el-col :span="1.5">
+        <el-button type="warning" plain icon="Download" @click="exportReceivable" v-hasPermi="['beverage:arap:list']">导出应收</el-button>
+      </el-col>
+      <el-col :span="1.5">
+        <el-button type="warning" plain icon="Upload" @click="exportPayable" v-hasPermi="['beverage:arap:list']">导出应付</el-button>
+      </el-col>
     </el-row>
 
     <el-tabs v-model="activeTab" @tab-change="loadData">
@@ -142,6 +148,16 @@ function settleText(s) {
 }
 function settleTag(s) {
   return s === '2' ? 'success' : s === '1' ? 'primary' : 'warning'
+}
+
+/** 导出应收汇总 */
+function exportReceivable() {
+  proxy.download("beverage/arap/exportReceivable", {}, `应收汇总_${new Date().getTime()}.xlsx`)
+}
+
+/** 导出应付汇总 */
+function exportPayable() {
+  proxy.download("beverage/arap/exportPayable", {}, `应付汇总_${new Date().getTime()}.xlsx`)
 }
 
 function loadData() {

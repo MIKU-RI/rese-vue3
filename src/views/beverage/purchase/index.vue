@@ -28,6 +28,9 @@
         <el-button type="success" plain icon="Edit" :disabled="single || editLocked" :title="editLocked ? '已入库或已产生退货的进货单不可修改，请先撤销入库' : ''" @click="handleUpdate" v-hasPermi="['beverage:purchase:edit']">修改</el-button>
       </el-col>
       <el-col :span="1.5">
+        <el-button type="warning" plain icon="Download" @click="handleExport" v-hasPermi="['beverage:purchase:list']">导出</el-button>
+      </el-col>
+      <el-col :span="1.5">
         <el-button type="danger" plain icon="Delete" :disabled="multiple || deleteLocked" :title="deleteLocked ? '已入库或已产生退货的进货单不可删除，请先撤销入库' : ''" @click="handleDelete" v-hasPermi="['beverage:purchase:remove']">删除</el-button>
       </el-col>
       <right-toolbar v-model:showSearch="showSearch" @queryTable="getList"></right-toolbar>
@@ -450,6 +453,11 @@ function addItem() {
 
 function removeItem(index) {
   form.value.items.splice(index, 1)
+}
+
+/** 导出按钮操作 */
+function handleExport() {
+  proxy.download("beverage/purchase/export", { ...queryParams.value }, `purchase_${new Date().getTime()}.xlsx`)
 }
 
 function getList() {
