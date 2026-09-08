@@ -20,8 +20,8 @@
               <el-table :data="docMap[props.row.counterpartyId] || []" size="small" style="margin: 0 40px">
                 <el-table-column label="销售单号" prop="saleNo" />
                 <el-table-column label="日期" prop="saleDate" width="120" />
-                <el-table-column label="应收总额" align="right" :formatter="fmtMoney" />
-                <el-table-column label="已收" align="right" :formatter="fmtMoney2" />
+                <el-table-column label="应收总额" prop="totalAmount" align="right" :formatter="fmtMoney" />
+                <el-table-column label="已收" prop="paidAmount" align="right" :formatter="fmtMoney2" />
                 <el-table-column label="未收" align="right" width="120">
                   <template #default="s"><span style="color:#f56c6c">¥{{ (Number(s.row.totalAmount) - Number(s.row.paidAmount)).toFixed(2) }}</span></template>
                 </el-table-column>
@@ -33,8 +33,8 @@
           </el-table-column>
           <el-table-column label="客户" prop="counterpartyName" />
           <el-table-column label="单据数" prop="billCount" width="90" align="center" />
-          <el-table-column label="应收总额" align="right" :formatter="fmtMoney" />
-          <el-table-column label="已收" align="right" :formatter="fmtMoney2" />
+          <el-table-column label="应收总额" prop="totalAmount" align="right" :formatter="fmtMoney" />
+          <el-table-column label="已收" prop="paidAmount" align="right" :formatter="fmtMoney2" />
           <el-table-column label="未收" align="right" width="130">
             <template #default="r"><span style="color:#f56c6c;font-weight:700">¥{{ Number(r.row.unpaid).toFixed(2) }}</span></template>
           </el-table-column>
@@ -58,8 +58,8 @@
               <el-table :data="docMap[props.row.counterpartyId] || []" size="small" style="margin: 0 40px">
                 <el-table-column label="采购单号" prop="purchaseNo" />
                 <el-table-column label="日期" prop="purchaseDate" width="120" />
-                <el-table-column label="应付总额" align="right" :formatter="fmtMoney" />
-                <el-table-column label="已付" align="right" :formatter="fmtMoney2" />
+                <el-table-column label="应付总额" prop="totalAmount" align="right" :formatter="fmtMoney" />
+                <el-table-column label="已付" prop="paidAmount" align="right" :formatter="fmtMoney2" />
                 <el-table-column label="未付" align="right" width="120">
                   <template #default="s"><span style="color:#f56c6c">¥{{ (Number(s.row.totalAmount) - Number(s.row.paidAmount)).toFixed(2) }}</span></template>
                 </el-table-column>
@@ -71,8 +71,8 @@
           </el-table-column>
           <el-table-column label="供应商" prop="counterpartyName" />
           <el-table-column label="单据数" prop="billCount" width="90" align="center" />
-          <el-table-column label="应付总额" align="right" :formatter="fmtMoney" />
-          <el-table-column label="已付" align="right" :formatter="fmtMoney2" />
+          <el-table-column label="应付总额" prop="totalAmount" align="right" :formatter="fmtMoney" />
+          <el-table-column label="已付" prop="paidAmount" align="right" :formatter="fmtMoney2" />
           <el-table-column label="未付" align="right" width="130">
             <template #default="r"><span style="color:#f56c6c;font-weight:700">¥{{ Number(r.row.unpaid).toFixed(2) }}</span></template>
           </el-table-column>
@@ -133,14 +133,17 @@ function loadData() {
 
 function onExpand(row, expandedRows) {
   if (!expandedRows || expandedRows.length === 0) return
+  const isExpanded = expandedRows.some(r => r.counterpartyId === row.counterpartyId)
+  if (!isExpanded) return
   if (docMap.value[row.counterpartyId]) return
+  const cpId = row.counterpartyId
   if (activeTab.value === 'receivable') {
-    listSale({ customerId: row.counterpartyId, status: '1', pageNum: 1, pageSize: 9999 }).then(res => {
-      docMap.value[row.counterpartyId] = res.rows || []
+    listSale({ customerId: cpId, status: '1', pageNum: 1, pageSize: 9999 }).then(res => {
+      docMap.value = { ...docMap.value, [cpId]: res.rows || [] }
     })
   } else {
-    listPurchase({ supplierId: row.counterpartyId, status: '1', pageNum: 1, pageSize: 9999 }).then(res => {
-      docMap.value[row.counterpartyId] = res.rows || []
+    listPurchase({ supplierId: cpId, status: '1', pageNum: 1, pageSize: 9999 }).then(res => {
+      docMap.value = { ...docMap.value, [cpId]: res.rows || [] }
     })
   }
 }
