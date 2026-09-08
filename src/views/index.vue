@@ -102,7 +102,7 @@
           <template #header>
             <div class="card-head">
               <span class="card-title">最近收付款流水</span>
-              <el-button link type="primary" @click="go('/beverage/settlement')">查看全部</el-button>
+              <el-button link type="primary" @click="go('/beverage/ledger/settlement')">查看全部</el-button>
             </div>
           </template>
           <el-table :data="recentSettlements" size="small" empty-text="暂无收付款流水">
@@ -218,10 +218,10 @@ const arapSummary = computed(() => {
 const acctCards = computed(() => {
   const k = dashboard.value.kpi || {}
   return [
-    { label: '应收未收（净）', value: fmtMoney(arapSummary.value.receivableTotal), sub: arapSummary.value.receivableDesc, color: '#F56C6C', path: '/beverage/arap' },
-    { label: '应付未付（净）', value: fmtMoney(arapSummary.value.payableTotal), sub: arapSummary.value.payableDesc, color: '#409EFF', path: '/beverage/arap' },
-    { label: '待入库货款', value: fmtMoney(k.pendingPurchaseAmount), sub: '入库后计入累计进货额', color: '#E6A23C', path: '/beverage/purchase' },
-    { label: '待出库货款', value: fmtMoney(k.pendingSaleAmount), sub: '待出库 ' + fmtInt(k.pendingSaleOrderCount) + ' 单 · 出库后计入销售额', color: '#E6A23C', path: '/beverage/sale' }
+    { label: '应收未收（净）', value: fmtMoney(arapSummary.value.receivableTotal), sub: arapSummary.value.receivableDesc, color: '#F56C6C', path: '/beverage/ledger/arap' },
+    { label: '应付未付（净）', value: fmtMoney(arapSummary.value.payableTotal), sub: arapSummary.value.payableDesc, color: '#409EFF', path: '/beverage/ledger/arap' },
+    { label: '待入库货款', value: fmtMoney(k.pendingPurchaseAmount), sub: '入库后计入累计进货额', color: '#E6A23C', path: '/beverage/flow/purchase' },
+    { label: '待出库货款', value: fmtMoney(k.pendingSaleAmount), sub: '待出库 ' + fmtInt(k.pendingSaleOrderCount) + ' 单 · 出库后计入销售额', color: '#E6A23C', path: '/beverage/flow/sale' }
   ]
 })
 

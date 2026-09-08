@@ -369,12 +369,12 @@ function formatMoney(val) {
 
 // 进入品牌单价管理：不传 brand 时打开品牌列表，传入则直达该品牌价格表
 function goBrandPrice(brand) {
-  proxy.$router.push({ path: '/beverage/brandPrice', query: brand ? { brand } : {} })
+  proxy.$router.push({ path: '/beverage/info/brandPrice', query: brand ? { brand } : {} })
 }
 
 // 进入品牌库存管理：不传 brand 时打开品牌列表，传入则直达该品牌库存表
 function goBrandStock(brand) {
-  proxy.$router.push({ path: '/beverage/brandStock', query: brand ? { brand } : {} })
+  proxy.$router.push({ path: '/beverage/info/brandStock', query: brand ? { brand } : {} })
 }
 
 function applyFilter() {
