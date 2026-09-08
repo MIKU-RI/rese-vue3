@@ -57,6 +57,7 @@
       <el-table-column label="操作" align="center" width="300" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-button v-if="scope.row.status === '1'" link type="primary" icon="View" @click="handleDetail(scope.row)">明细</el-button>
+          <el-button v-if="scope.row.status === '1'" link type="info" icon="Printer" @click="handlePrint(scope.row)">打印</el-button>
           <el-button v-if="scope.row.status === '1' && scope.row.settleStatus !== '2'" link type="warning" icon="Wallet" @click="openPay(scope.row)" v-hasPermi="['beverage:settlement:add']">已付款</el-button>
           <el-button v-if="scope.row.status === '0'" link type="success" icon="Bottom" @click="handleInbound(scope.row)" v-hasPermi="['beverage:purchase:edit']">入库</el-button>
           <el-button v-if="scope.row.status === '1' && scope.row.settleStatus === '2'" link type="danger" icon="RefreshLeft" @click="goReturn(scope.row)" :disabled="returning || allReturned(scope.row)" :title="allReturned(scope.row) ? '该单已全部退款，无剩余可退数量' : ''" v-hasPermi="['beverage:return:add']">退货</el-button>
@@ -217,11 +218,15 @@
         </div>
       </template>
     </el-dialog>
+
+    <!-- 入库单打印预览 -->
+    <doc-print v-model="printOpen" doc-type="purchase" :doc="printDoc" />
   </div>
 </template>
 
 <script setup name="BeveragePurchase">
 import { listPurchase, getPurchase, delPurchase, addPurchase, updatePurchase } from "@/api/beverage/purchase"
+import DocPrint from "@/components/DocPrint/index.vue"
 import { listSupplier } from "@/api/beverage/supplier"
 import { listProduct } from "@/api/beverage/product"
 import { listBatch } from "@/api/beverage/batch"
@@ -357,6 +362,8 @@ const multiple = ref(true)
 const total = ref(0)
 const title = ref("")
 const detail = reactive({ purchaseNo: '', supplierName: '', purchaseDate: '', status: '', totalAmount: 0, items: [] })
+const printOpen = ref(false)
+const printDoc = ref({})
 
 const statusOptions = ref([
   { label: '待入库', value: '0' },
@@ -553,6 +560,14 @@ function handleDetail(row) {
     Object.assign(detail, res.data)
     if (!detail.items) detail.items = []
     detailOpen.value = true
+  })
+}
+
+// 打印入库单：取全量(含明细)后打开打印预览
+function handlePrint(row) {
+  getPurchase(row.purchaseId).then(res => {
+    printDoc.value = res.data || {}
+    printOpen.value = true
   })
 }
 

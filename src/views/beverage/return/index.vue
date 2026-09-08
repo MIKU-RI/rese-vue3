@@ -84,6 +84,7 @@
       <el-table-column label="操作" align="center" width="210" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-button v-if="scope.row.status === '1'" link type="primary" icon="View" @click="handleDetail(scope.row)">明细</el-button>
+          <el-button v-if="scope.row.status === '1'" link type="info" icon="Printer" @click="handlePrint(scope.row)">打印</el-button>
           <el-button v-if="scope.row.status === '0'" link type="success" icon="Top" @click="handleApply(scope.row)" v-hasPermi="['beverage:return:edit']">退货</el-button>
           <el-button v-if="scope.row.status === '1'" link type="warning" icon="Bottom" @click="handleReverse(scope.row)" v-hasPermi="['beverage:return:edit']">撤销退货</el-button>
           <el-button v-if="scope.row.status === '0'" link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['beverage:return:edit']">修改</el-button>
@@ -223,6 +224,9 @@
         <el-table-column :label="detail.returnType === '2' ? '实收金额' : '金额'" width="110" align="center"><template #default="s">¥ {{ formatMoney(s.row.amount) }}</template></el-table-column>
       </el-table>
     </el-dialog>
+
+    <!-- 退货单打印预览 -->
+    <doc-print v-model="printOpen" doc-type="return" :doc="printDoc" />
   </div>
 </template>
 
@@ -235,6 +239,7 @@ import { getPurchase } from "@/api/beverage/purchase"
 import { getSale } from "@/api/beverage/sale"
 import { listPurchase } from "@/api/beverage/purchase"
 import { listSale } from "@/api/beverage/sale"
+import DocPrint from "@/components/DocPrint/index.vue"
 import { parseTime } from "@/utils/ruoyi"
 import { useRoute, useRouter } from 'vue-router'
 
@@ -424,6 +429,8 @@ const multiple = ref(true)
 const total = ref(0)
 const title = ref("")
 const detail = reactive({ returnNo: '', sourceNo: '', returnType: '1', supplierName: '', customerName: '', returnDate: '', status: '', totalAmount: 0, items: [] })
+const printOpen = ref(false)
+const printDoc = ref({})
 
 const returnTypeOptions = ref([
   { label: '采购退货', value: '1' },
@@ -602,6 +609,14 @@ function handleDetail(row) {
     Object.assign(detail, res.data)
     if (!detail.items) detail.items = []
     detailOpen.value = true
+  })
+}
+
+// 打印退货单：取全量(含明细)后打开打印预览
+function handlePrint(row) {
+  getReturn(row.returnId).then(res => {
+    printDoc.value = res.data || {}
+    printOpen.value = true
   })
 }
 
