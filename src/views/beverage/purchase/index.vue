@@ -79,14 +79,15 @@
           </el-col>
           <el-col :span="12">
             <el-form-item label="进货日期" prop="purchaseDate">
-              <el-date-picker v-model="form.purchaseDate" type="date" value-format="YYYY-MM-DD" format="YYYY-MM-DD" placeholder="选择日期" style="width: 100%" />
+              <el-date-picker v-model="form.purchaseDate" type="date" value-format="YYYY-MM-DD" format="YYYY-MM-DD" placeholder="选择日期" style="width: 100%" :disabled-date="disabledDocDate" />
+              <div style="color:#909399;font-size:12px;line-height:1.4;">{{ dateRangeTip }}</div>
             </el-form-item>
           </el-col>
         </el-row>
         <el-row>
           <el-col :span="12">
             <el-form-item label="状态">
-              <el-radio-group v-model="form.status">
+              <el-radio-group v-model="form.status" @change="onStatusChange">
                 <el-radio value="0">待入库</el-radio>
                 <el-radio value="1" :disabled="!isAdmin" :title="!isAdmin ? '仅超管可直接登记为已入库，普通用户请先保存待入库再执行「入库」' : ''">已入库</el-radio>
               </el-radio-group>
@@ -370,11 +371,57 @@ const data = reactive({
   },
   rules: {
     supplierName: [{ required: true, message: "供应商名称不能为空", trigger: "blur" }],
-    purchaseDate: [{ required: true, message: "进货日期不能为空", trigger: "change" }]
+    purchaseDate: [
+      { required: true, message: "进货日期不能为空", trigger: "change" },
+      { validator: validateDocDate, trigger: "change" }
+    ]
   }
 })
 
 const { queryParams, form, rules } = toRefs(data)
+
+// ===== 日期与状态交叉校验：待入库≥今天、已入库≤今天 =====
+function todayStr() {
+  const d = new Date()
+  const p = n => String(n).padStart(2, '0')
+  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate())
+}
+
+// 可选日期范围随状态切换：已入库只能选今天及以前，待入库只能选今天及以后
+function disabledDocDate(d) {
+  const t = new Date(); t.setHours(0, 0, 0, 0)
+  return form.value.status === '1' ? d.getTime() > t.getTime() : d.getTime() < t.getTime()
+}
+
+const dateRangeTip = computed(() => {
+  return form.value.status === '1'
+    ? '已入库：只能选择今天(' + todayStr() + ')或更早的日期'
+    : '待入库：只能选择今天(' + todayStr() + ')或更晚的日期'
+})
+
+function validateDocDate(rule, value, callback) {
+  if (!value) return callback()
+  const t = todayStr()
+  if (form.value.status === '1' && value > t) {
+    return callback(new Error('已入库单据的进货日期不能晚于今天（应≤' + t + '）'))
+  }
+  if (form.value.status === '0' && value < t) {
+    return callback(new Error('待入库单据的进货日期不能早于今天（应≥' + t + '）'))
+  }
+  callback()
+}
+
+// 切换状态时，已填日期可能不再合法，立即提示并重新校验
+function onStatusChange() {
+  const v = form.value.purchaseDate
+  const t = todayStr()
+  if (v && form.value.status === '1' && v > t) {
+    proxy.$modal.msgWarning('「已入库」的日期不能晚于今天，请改选 ' + t + ' 或更早的日期')
+  } else if (v && form.value.status === '0' && v < t) {
+    proxy.$modal.msgWarning('「待入库」的日期不能早于今天，请改选 ' + t + ' 或更晚的日期')
+  }
+  if (proxy.$refs.purchaseRef) proxy.$refs.purchaseRef.validateField('purchaseDate')
+}
 
 function formatMoney(val) {
   if (val == null) return '0.00'
@@ -503,6 +550,12 @@ function handleDetail(row) {
 
 // 一键入库 / 撤销入库：取全量(含明细)翻转状态后保存，复用已验证的库存联动
 function handleInbound(row) {
+  // 已入库单据日期不能晚于今天，晚于则提示先改日期（不自动改，避免覆盖用户填写值）
+  const t = todayStr()
+  if (row.purchaseDate && row.purchaseDate > t) {
+    proxy.$modal.msgError('该单进货日期「' + row.purchaseDate + '」晚于今天，请先把日期改为 ' + t + ' 或更早再执行入库')
+    return
+  }
   proxy.$modal.confirm('确认将进货单「' + row.purchaseNo + '」入库？将增加对应商品库存。').then(() => {
     getPurchase(row.purchaseId).then(res => {
       const d = res.data
