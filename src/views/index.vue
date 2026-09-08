@@ -6,23 +6,27 @@
       <el-button :loading="refreshing" icon="Refresh" @click="refresh">刷新数据</el-button>
     </div>
 
-    <!-- KPI 卡片 -->
+    <!-- 资金账目 -->
     <el-row :gutter="16">
+      <el-col :xs="12" :sm="12" :md="6" :lg="6" v-for="acct in acctCards" :key="acct.label">
+        <el-card shadow="hover" class="acct-card" @click="go(acct.path)">
+          <div class="acct-label">
+            {{ acct.label }}
+            <el-icon class="acct-arrow"><ArrowRight /></el-icon>
+          </div>
+          <div class="acct-value" :style="{ color: acct.color }">{{ acct.value }}</div>
+          <div class="acct-sub">{{ acct.sub }}</div>
+        </el-card>
+      </el-col>
+    </el-row>
+
+    <!-- KPI 卡片 -->
+    <el-row :gutter="16" class="mt16">
       <el-col :xs="12" :sm="12" :md="6" :lg="6" v-for="kpi in kpis" :key="kpi.label">
         <el-card shadow="hover" class="kpi-card">
           <div class="kpi-label">{{ kpi.label }}</div>
           <div class="kpi-value" :style="kpi.color ? { color: kpi.color } : null">{{ kpi.value }}</div>
           <div class="kpi-sub">{{ kpi.sub }}</div>
-        </el-card>
-      </el-col>
-    </el-row>
-
-    <!-- 模块快捷入口 -->
-    <el-row :gutter="16" class="mt16">
-      <el-col :xs="12" :sm="8" :md="4" v-for="m in quickLinks" :key="m.path">
-        <el-card shadow="hover" class="quick-card" @click="go(m.path)">
-          <el-icon class="quick-icon" :style="{ color: m.color }"><component :is="m.icon" /></el-icon>
-          <div class="quick-label">{{ m.label }}</div>
         </el-card>
       </el-col>
     </el-row>
@@ -71,6 +75,49 @@
       </el-col>
     </el-row>
 
+    <!-- 最近收付款流水 -->
+    <el-row :gutter="16" class="mt16">
+      <el-col :span="24">
+        <el-card shadow="hover" class="flow-card">
+          <template #header>
+            <div class="card-head">
+              <span class="card-title">最近收付款流水</span>
+              <el-button link type="primary" @click="go('/beverage/settlement')">查看全部</el-button>
+            </div>
+          </template>
+          <el-table :data="recentSettlements" size="small" empty-text="暂无收付款流水">
+            <el-table-column label="类型" width="80" align="center">
+              <template #default="scope">
+                <el-tag :type="scope.row.bizType === '1' ? 'success' : 'warning'" size="small">
+                  {{ scope.row.bizType === '1' ? '收款' : '付款' }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="往来单位" prop="counterpartyName" min-width="140" show-overflow-tooltip />
+            <el-table-column label="关联单号" prop="relatedNo" min-width="150" show-overflow-tooltip />
+            <el-table-column label="金额" width="130" align="right">
+              <template #default="scope">
+                <span :style="{ color: scope.row.bizType === '1' ? '#67C23A' : '#E6A23C', fontWeight: 600 }">
+                  {{ (scope.row.bizType === '1' ? '+ ' : '- ') + fmtMoney(scope.row.amount) }}
+                </span>
+              </template>
+            </el-table-column>
+            <el-table-column label="方式" width="90" align="center">
+              <template #default="scope">{{ payMethodText(scope.row.payMethod) }}</template>
+            </el-table-column>
+            <el-table-column label="日期" prop="settleDate" width="110" align="center" />
+            <el-table-column label="状态" width="80" align="center">
+              <template #default="scope">
+                <el-tag :type="scope.row.status === '0' ? 'success' : 'info'" size="small">
+                  {{ scope.row.status === '0' ? '正常' : '作废' }}
+                </el-tag>
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-card>
+      </el-col>
+    </el-row>
+
     <!-- 低库存清单 -->
     <el-row :gutter="16" class="mt16">
       <el-col :span="24">
@@ -103,21 +150,22 @@
 import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import * as echarts from 'echarts'
 import { useRouter } from 'vue-router'
+import { ArrowRight } from '@element-plus/icons-vue'
 import { getDashboard } from '@/api/beverage/dashboard'
+import { receivableList, payableList } from '@/api/beverage/arap'
+import { listSettlement } from '@/api/beverage/settlement'
 
 const router = useRouter()
 const dashboard = ref({})
 const refreshing = ref(false)
 const lowStock = computed(() => dashboard.value.lowStock || [])
+const arap = ref({ receivable: [], payable: [] })
+const recentSettlements = ref([])
 
-const quickLinks = ref([
-  { label: '商品管理', path: '/beverage/product', icon: 'Goods', color: '#409EFF' },
-  { label: '供应商', path: '/beverage/supplier', icon: 'OfficeBuilding', color: '#67C23A' },
-  { label: '客户门店', path: '/beverage/customer', icon: 'Shop', color: '#E6A23C' },
-  { label: '库存台账', path: '/beverage/stock', icon: 'Box', color: '#909399' },
-  { label: '采购进货', path: '/beverage/purchase', icon: 'ShoppingCart', color: '#F56C6C' },
-  { label: '销售出库', path: '/beverage/sale', icon: 'Sell', color: '#9254DE' }
-])
+const PAY_METHODS = { '1': '现金', '2': '银行转账', '3': '微信', '4': '支付宝' }
+function payMethodText(v) {
+  return PAY_METHODS[v] || v || '-'
+}
 
 function go(path) {
   router.push(path)
@@ -131,19 +179,55 @@ function fmtInt(v) {
   return (Number(v || 0)).toLocaleString('zh-CN')
 }
 
+// ---- 资金账目（净额口径：应收未收/应付未付 = 单据净额 − 已收付） ----
+const arapSummary = computed(() => {
+  const rec = arap.value.receivable || []
+  const pay = arap.value.payable || []
+  const sum = arr => arr.reduce((s, i) => s + Number(i.unpaid || 0), 0)
+  const top = arr => arr.slice().sort((a, b) => Number(b.unpaid || 0) - Number(a.unpaid || 0))[0]
+  const rt = rec.length ? top(rec) : null
+  const pt = pay.length ? top(pay) : null
+  return {
+    receivableTotal: sum(rec),
+    receivableDesc: rec.length ? rec.length + ' 家客户待收 · 最多 ' + rt.counterpartyName + ' ' + fmtMoney(rt.unpaid) : '暂无待收账款',
+    payableTotal: sum(pay),
+    payableDesc: pay.length ? pay.length + ' 家供应商待付 · 最多 ' + pt.counterpartyName + ' ' + fmtMoney(pt.unpaid) : '暂无待付账款'
+  }
+})
+
+const acctCards = computed(() => {
+  const k = dashboard.value.kpi || {}
+  return [
+    { label: '应收未收（净）', value: fmtMoney(arapSummary.value.receivableTotal), sub: arapSummary.value.receivableDesc, color: '#F56C6C', path: '/beverage/arap' },
+    { label: '应付未付（净）', value: fmtMoney(arapSummary.value.payableTotal), sub: arapSummary.value.payableDesc, color: '#409EFF', path: '/beverage/arap' },
+    { label: '待入库货款', value: fmtMoney(k.pendingPurchaseAmount), sub: '入库后计入累计进货额', color: '#E6A23C', path: '/beverage/purchase' },
+    { label: '待出库货款', value: fmtMoney(k.pendingSaleAmount), sub: '待出库 ' + fmtInt(k.pendingSaleOrderCount) + ' 单 · 出库后计入销售额', color: '#E6A23C', path: '/beverage/sale' }
+  ]
+})
+
+// 近 7 日趋势最后一位 = 今日净额
+function trendLast(key) {
+  const arr = (dashboard.value.trend || {})[key] || []
+  return Number(arr.length ? arr[arr.length - 1] : 0)
+}
+function trendSum(key) {
+  const arr = (dashboard.value.trend || {})[key] || []
+  return arr.reduce((s, v) => s + Number(v || 0), 0)
+}
+
 const kpis = computed(() => {
   const k = dashboard.value.kpi || {}
   const profitColor = Number(k.profit || 0) < 0 ? '#F56C6C' : '#67C23A'
   const rateColor = Number(k.profitRate || 0) < 0 ? '#F56C6C' : '#67C23A'
   return [
-    { label: '商品种类', value: fmtInt(k.productTotal), sub: '低库存 ' + (k.lowStockTotal || 0) + ' 项待补货' },
-    { label: '库存总量', value: fmtInt(k.stockTotalQty) + ' 件', sub: '覆盖 ' + (k.productTotal || 0) + ' 个 SKU' },
-    { label: '累计进货额', value: fmtMoney(k.purchaseTotalAmount), sub: '已入库 · 采购退货 ' + fmtMoney(k.purchaseReturnAmount) + ' · 待入库 ' + fmtMoney(k.pendingPurchaseAmount) },
+    { label: '今日净销售', value: fmtMoney(trendLast('sale')), sub: '近 7 日 ' + fmtMoney(trendSum('sale')) },
+    { label: '今日净进货', value: fmtMoney(trendLast('purchase')), sub: '近 7 日 ' + fmtMoney(trendSum('purchase')) },
     { label: '累计销售额', value: fmtMoney(k.saleTotalAmount), sub: '已出库 · 销售退货 ' + fmtMoney(k.saleReturnAmount) + ' · 待出库 ' + fmtMoney(k.pendingSaleAmount) },
+    { label: '累计进货额', value: fmtMoney(k.purchaseTotalAmount), sub: '已入库 · 采购退货 ' + fmtMoney(k.purchaseReturnAmount) + ' · 待入库 ' + fmtMoney(k.pendingPurchaseAmount) },
     { label: '累计毛利', value: fmtMoney(k.profit), sub: '净销售额(扣销售退货) − 净进货额(扣采购退货)', color: profitColor },
     { label: '毛利率', value: (Number(k.profitRate || 0)).toFixed(2) + ' %', sub: '毛利 ÷ 净销售额', color: rateColor },
     { label: '客单价', value: fmtMoney(k.avgOrderValue), sub: '销售额 ÷ ' + (k.saleOrderCount || 0) + ' 单' },
-    { label: '销售单数', value: fmtInt(k.saleOrderCount), sub: '已出库 · 待出库 ' + fmtInt(k.pendingSaleOrderCount) + ' 单' }
+    { label: '库存总量', value: fmtInt(k.stockTotalQty) + ' 件', sub: '覆盖 ' + (k.productTotal || 0) + ' 个 SKU · 低库存 ' + (k.lowStockTotal || 0) + ' 项' }
   ]
 })
 
@@ -286,6 +370,21 @@ function resizeAll() {
   charts.forEach(c => c && c.resize())
 }
 
+async function loadFinance() {
+  try {
+    const [rec, pay] = await Promise.all([receivableList(), payableList()])
+    arap.value = { receivable: rec.data || [], payable: pay.data || [] }
+  } catch (e) {
+    console.error('加载往来账目失败', e)
+  }
+  try {
+    const res = await listSettlement({ pageNum: 1, pageSize: 8, status: '0', orderByColumn: 'createTime', isAsc: 'desc' })
+    recentSettlements.value = res.rows || []
+  } catch (e) {
+    console.error('加载最近流水失败', e)
+  }
+}
+
 async function loadDashboard() {
   refreshing.value = true
   try {
@@ -296,6 +395,7 @@ async function loadDashboard() {
   }
   await nextTick()
   charts = [renderTrend(), renderStock(), renderTop(), renderCat()]
+  loadFinance()
   refreshing.value = false
 }
 
@@ -349,21 +449,43 @@ onBeforeUnmount(() => {
 .mt16 {
   margin-top: 16px;
 }
-.quick-card {
+.acct-card {
   cursor: pointer;
-  text-align: center;
   transition: transform .15s ease;
 }
-.quick-card:hover {
+.acct-card:hover {
   transform: translateY(-3px);
 }
-.quick-icon {
-  font-size: 26px;
-  margin-bottom: 6px;
-}
-.quick-label {
+.acct-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #909399;
   font-size: 13px;
-  color: #606266;
+}
+.acct-arrow {
+  color: #c0c4cc;
+  font-size: 14px;
+}
+.acct-card:hover .acct-arrow {
+  color: #409eff;
+}
+.acct-value {
+  margin: 8px 0 4px;
+  font-size: 26px;
+  font-weight: 700;
+}
+.acct-sub {
+  font-size: 12px;
+  color: #909399;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 .card-title {
   font-weight: 600;
