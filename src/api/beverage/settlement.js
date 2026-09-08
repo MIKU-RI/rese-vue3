@@ -34,3 +34,13 @@ export function delSettlement(ids) {
     method: 'delete'
   })
 }
+
+// 一键结清（已收/已付）：按剩余金额创建流水并标记单据已结
+// data: { bizType: '1'收款/'2'付款, relatedId, payMethod, remark }
+export function settleInFull(data) {
+  return request({
+    url: '/beverage/settlement/settleInFull',
+    method: 'post',
+    data: data
+  })
+}

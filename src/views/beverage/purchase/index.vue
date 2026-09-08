@@ -54,7 +54,20 @@
       <el-table-column label="操作" align="center" width="300" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-button v-if="scope.row.status === '1'" link type="primary" icon="View" @click="handleDetail(scope.row)">明细</el-button>
-          <el-button v-if="scope.row.status === '1'" link type="warning" icon="Wallet" @click="openPay(scope.row)" v-hasPermi="['beverage:settlement:add']">付款</el-button>
+          <el-popconfirm :title="'确认将采购单【' + scope.row.purchaseNo + '】标记为供应商已付款？'" width="320" @confirm="confirmPay(scope.row)">
+            <template #reference>
+              <el-button v-if="scope.row.status === '1' && scope.row.settleStatus !== '2'" link type="warning" icon="Wallet" v-hasPermi="['beverage:settlement:add']">已付款</el-button>
+            </template>
+            <template #default>
+              <div style="margin-bottom:8px;color:#606266;font-size:13px;">付款方式</div>
+              <el-select v-model="fullPayMethod" size="small" style="width:100%">
+                <el-option label="现金" value="1" />
+                <el-option label="银行" value="2" />
+                <el-option label="微信" value="3" />
+                <el-option label="支付宝" value="4" />
+              </el-select>
+            </template>
+          </el-popconfirm>
           <el-button v-if="scope.row.status === '0'" link type="success" icon="Bottom" @click="handleInbound(scope.row)" v-hasPermi="['beverage:purchase:edit']">入库</el-button>
           <el-button v-if="scope.row.status === '1'" link type="danger" icon="RefreshLeft" @click="goReturn(scope.row)" :disabled="returning || allReturned(scope.row)" :title="allReturned(scope.row) ? '该单已全部退货，无剩余可退数量' : ''" v-hasPermi="['beverage:return:add']">退货</el-button>
           <el-button v-if="scope.row.status === '1' && isAdmin" link type="warning" icon="Top" @click="handleReverseInbound(scope.row)" :disabled="hasReturn(scope.row)" :title="hasReturn(scope.row) ? '该单已产生退货记录，不可撤销入库；如需调整请通过「采购退货单」处理' : ''" v-hasPermi="['beverage:purchase:edit']">撤销入库</el-button>
@@ -191,7 +204,6 @@
 
     <!-- 退货预览确认：先预览原单可退商品并调整数量，确认后再生成退货单（不再一键直接生成） -->
     <ReturnPreviewDialog v-model="returnOpen" source-type="1" :source-id="returnRow.purchaseId" :source-no="returnRow.purchaseNo" @success="getList" />
-    <SettlementDialog v-model="settleOpen" biz-type="2" :preset-related-id="settleRow.purchaseId" :preset-counterparty-id="settleRow.supplierId" @success="getList" />
   </div>
 </template>
 
@@ -200,8 +212,8 @@ import { listPurchase, getPurchase, delPurchase, addPurchase, updatePurchase } f
 import { listSupplier } from "@/api/beverage/supplier"
 import { listProduct } from "@/api/beverage/product"
 import { listBatch } from "@/api/beverage/batch"
+import { settleInFull } from "@/api/beverage/settlement"
 import ReturnPreviewDialog from "@/views/beverage/components/ReturnPreviewDialog.vue"
-import SettlementDialog from "@/views/beverage/components/SettlementDialog.vue"
 import { parseTime } from "@/utils/ruoyi"
 import useUserStore from '@/store/modules/user'
 
@@ -510,13 +522,13 @@ function goReturn(row) {
   returnOpen.value = true
 }
 
-// 付款登记：预填供应商与采购单，唤起共享收付款弹窗
-const settleOpen = ref(false)
-const settleRow = reactive({ purchaseId: undefined, supplierId: undefined })
-function openPay(row) {
-  settleRow.purchaseId = row.purchaseId
-  settleRow.supplierId = row.supplierId
-  settleOpen.value = true
+// 一键结清：标记供应商已付款（按剩余金额创建流水并标记单据已结）
+const fullPayMethod = ref("2")
+function confirmPay(row) {
+  settleInFull({ bizType: "2", relatedId: row.purchaseId, payMethod: fullPayMethod.value }).then(() => {
+    proxy.$modal.msgSuccess("已标记为供应商已付款")
+    getList()
+  }).catch(() => {})
 }
 
 function submitForm() {
