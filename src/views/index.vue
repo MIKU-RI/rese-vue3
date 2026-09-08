@@ -54,7 +54,19 @@
       <el-col :xs="24" :sm="24" :md="12" :lg="12">
         <el-card shadow="hover">
           <template #header><span class="card-title">各品牌库存占比</span></template>
-          <div ref="catChart" class="chart"></div>
+          <div class="cat-wrap">
+            <div ref="catChart" class="cat-chart"></div>
+            <div class="cat-list">
+              <div v-if="!catRows.length" class="cat-empty">暂无品牌库存数据</div>
+              <div v-for="d in catRows" :key="d.name" class="cat-row"
+                   @mouseenter="hlCat(d.name, true)" @mouseleave="hlCat(d.name, false)">
+                <span class="cat-dot" :style="{ background: d.color }"></span>
+                <span class="cat-name" :title="d.name">{{ d.name }}</span>
+                <span class="cat-qty">{{ fmtInt(d.value) }} 件</span>
+                <span class="cat-pct">{{ d.pct }}%</span>
+              </div>
+            </div>
+          </div>
         </el-card>
       </el-col>
     </el-row>
@@ -206,24 +218,68 @@ function renderTop() {
   return c
 }
 
+// ---- 品牌库存占比：Top 8 独立配色，其余合并「其他」，右侧榜单与扇区悬停联动 ----
+const CAT_PALETTE = ['#5470c6', '#91cc75', '#fac858', '#ee6666', '#73c0de', '#3ba272', '#fc8452', '#9a60b4', '#d4a5fb', '#e07b9a']
+const CAT_TOP_N = 10
+let catInstance = null
+
+const catRows = computed(() => {
+  const items = (dashboard.value.brandShare || [])
+    .map(i => ({ name: i.name, value: Number(i.value || 0) }))
+    .filter(i => i.value > 0)
+  items.sort((a, b) => b.value - a.value)
+  const total = items.reduce((s, i) => s + i.value, 0)
+  if (!total) return []
+  const rows = items.slice(0, CAT_TOP_N).map((i, idx) => ({
+    ...i,
+    pct: (i.value / total * 100).toFixed(1),
+    color: CAT_PALETTE[idx % CAT_PALETTE.length]
+  }))
+  const restValue = items.slice(CAT_TOP_N).reduce((s, i) => s + i.value, 0)
+  if (restValue > 0) {
+    rows.push({ name: '其他', value: restValue, pct: (restValue / total * 100).toFixed(1), color: '#C0C4CC' })
+  }
+  return rows
+})
+
 function renderCat() {
-  const items = dashboard.value.brandShare || []
+  if (catInstance) { catInstance.dispose(); catInstance = null }
   const c = echarts.init(catChart.value)
+  catInstance = c
+  const totalQty = catRows.value.reduce((s, i) => s + i.value, 0)
   c.setOption({
-    tooltip: { trigger: 'item' },
-    legend: { bottom: 0 },
+    tooltip: {
+      trigger: 'item',
+      formatter: p => `${p.marker} ${p.name}<br/>库存 ${fmtInt(p.value)} 件（${p.percent}%）`
+    },
+    title: {
+      text: '库存总量',
+      subtext: fmtInt(totalQty) + ' 件',
+      left: 'center',
+      top: '40%',
+      textStyle: { fontSize: 12, fontWeight: 400, color: '#909399' },
+      subtextStyle: { fontSize: 18, fontWeight: 700, color: '#303133' }
+    },
     series: [
       {
         name: '品牌库存占比',
         type: 'pie',
-        radius: ['40%', '65%'],
-        itemStyle: { borderRadius: 6 },
-        label: { show: true, formatter: '{b}\n{d}%' },
-        data: items.map(i => ({ name: i.name, value: Number(i.value || 0) }))
+        radius: ['48%', '70%'],
+        center: ['50%', '50%'],
+        itemStyle: { borderRadius: 6, borderColor: '#fff', borderWidth: 2 },
+        label: { show: false },
+        labelLine: { show: false },
+        emphasis: { scale: true, scaleSize: 6 },
+        data: catRows.value.map(i => ({ name: i.name, value: i.value, itemStyle: { color: i.color } }))
       }
     ]
   })
   return c
+}
+
+function hlCat(name, on) {
+  if (!catInstance) return
+  catInstance.dispatchAction({ type: on ? 'highlight' : 'downplay', seriesName: '品牌库存占比', name })
 }
 
 function resizeAll() {
@@ -315,5 +371,70 @@ onBeforeUnmount(() => {
 .chart {
   width: 100%;
   height: 320px;
+}
+.cat-wrap {
+  display: flex;
+  align-items: stretch;
+  height: 320px;
+}
+.cat-chart {
+  flex: 1.15;
+  min-width: 0;
+  height: 100%;
+}
+.cat-list {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  padding: 6px 4px 6px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.cat-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3.5px 8px;
+  border-radius: 6px;
+  transition: background .15s;
+}
+.cat-row:hover {
+  background: #f5f7fa;
+}
+.cat-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex: none;
+}
+.cat-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  color: #303133;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cat-qty {
+  flex: none;
+  font-size: 12px;
+  color: #909399;
+}
+.cat-pct {
+  flex: none;
+  width: 52px;
+  text-align: right;
+  font-size: 13px;
+  font-weight: 600;
+  color: #303133;
+  font-variant-numeric: tabular-nums;
+}
+.cat-empty {
+  color: #909399;
+  font-size: 13px;
+  text-align: center;
+  margin-top: 40px;
 }
 </style>
